@@ -195,7 +195,7 @@
 </head>
 <body>
     <header>
-        <h1>💪 Meu Treino</h1>
+        <h1>Treino do Meu Benzinho</h1>
         <select id="workout-selector" aria-label="Escolher treino">
             <option value="A">Treino A - Inferiores</option>
             <option value="B">Treino B - Superiores</option>
@@ -214,7 +214,7 @@
     <script>
         const treinos = {
             "A": [
-                { nome: "Extensão de Panturrilha esticada", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/standing-calf-raise.gif" },
+                { nome: "Extensão de Panturrilha Esticada", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/standing-calf-raise.gif" },
                 { nome: "Cadeira Abdutora", series: 3, reps: "10 a 12", descanso: 90, img: "gifs/hip-abduction-machine.gif" },
                 { nome: "Cadeira Flexora", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/seated-leg-curl.gif" },
                 { nome: "Agachamento", series: 3, reps: "6 a 8", descanso: 150, img: "gifs/barbell-squat.gif" },
@@ -222,28 +222,28 @@
                 { nome: "Cadeira Extensora", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/leg-extension.gif" }
             ],
             "B": [
-                { nome: "Supino inclinado maquina", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/incline-chest-press-machine.gif" },
-                { nome: "Remada unilateral maquina", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/seated-row-machine.gif" },
-                { nome: "Elevação lateral", series: 3, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif" },
-                { nome: "Elevação frontal inclinada", series: 2, reps: "12 a 15", descanso: 60, img: "gifs/elevacao-frontal-inclinada.gif" },
-                { nome: "Triceps frances", series: 2, reps: "8 a 10", descanso: 60, img: "gifs/seated-dumbbell-triceps-extension.gif" },
-                { nome: "Elevação de pernas", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/lying-leg-raise.gif" }
+                { nome: "Supino Inclinado Máquina", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/incline-chest-press-machine.gif" },
+                { nome: "Remada Unilateral Máquina", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/seated-row-machine.gif" },
+                { nome: "Elevação Lateral", series: 3, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif" },
+                { nome: "Elevação Frontal Inclinada", series: 2, reps: "12 a 15", descanso: 60, img: "gifs/elevacao-frontal-inclinada.gif" },
+                { nome: "Triceps Francês", series: 2, reps: "8 a 10", descanso: 60, img: "gifs/seated-dumbbell-triceps-extension.gif" },
+                { nome: "Elevação de Pernas", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/lying-leg-raise.gif" }
             ],
             "C": [
-                { nome: "Extensão de Panturrilha esticada", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/standing-calf-raise.gif" },
-                { nome: "Cadeira adutora", series: 2, reps: "12 a 15", descanso: 90, img: "gifs/hip-adduction-machine.gif" },
-                { nome: "Banco romano com peso", series: 3, reps: "10 a 12", descanso: 120, img: "gifs/weighted-back-extension.gif" },
-                { nome: "Leg press", series: 3, reps: "8 a 10", descanso: 150, img: "gifs/leg-press.gif" },
+                { nome: "Extensão de Panturrilha Esticada", series: 3, reps: "12 a 15", descanso: 60, img: "gifs/standing-calf-raise.gif" },
+                { nome: "Cadeira Adutora", series: 2, reps: "12 a 15", descanso: 90, img: "gifs/hip-adduction-machine.gif" },
+                { nome: "Banco Romano com Peso", series: 3, reps: "10 a 12", descanso: 120, img: "gifs/weighted-back-extension.gif" },
+                { nome: "Leg Press", series: 3, reps: "8 a 10", descanso: 150, img: "gifs/leg-press.gif" },
                 { nome: "Búlgaro", series: 2, reps: "8 a 10", descanso: 120, img: "gifs/dumbbell-bulgarian-split-squat.gif" },
-                { nome: "Cadeira flexora", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/seated-leg-curl.gif" }
+                { nome: "Cadeira Flexora", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/seated-leg-curl.gif" }
             ],
             "D": [
-                { nome: "Desenvolvimento na maquina", series: 3, reps: "8 a 10", descanso: 90, img: "gifs/lever-shoulder-press.gif" },
-                { nome: "Puxador frontal", series: 3, reps: "8 a 10", descanso: 90, img: "gifs/lat-pulldown.gif" },
-                { nome: "Elevação lateral", series: 2, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif" },
+                { nome: "Desenvolvimento de Ombros", series: 3, reps: "8 a 10", descanso: 90, img: "gifs/lever-shoulder-press.gif" },
+                { nome: "Puxador Frontal", series: 3, reps: "8 a 10", descanso: 90, img: "gifs/lat-pulldown.gif" },
+                { nome: "Elevação Lateral", series: 2, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif" },
                 { nome: "Crucifixo", series: 2, reps: "10 a 12", descanso: 90, img: "gifs/dumbbell-fly.gif" },
-                { nome: "Rosca alternada", series: 2, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-curl.gif" },
-                { nome: "Abdominal maquina", series: 3, reps: "10 a 12", descanso: 60, img: "gifs/seated-ab-crunch-machine.gif" }
+                { nome: "Rosca Alternada", series: 2, reps: "10 a 12", descanso: 60, img: "gifs/dumbbell-curl.gif" },
+                { nome: "Abdominal Máquina", series: 3, reps: "10 a 12", descanso: 60, img: "gifs/seated-ab-crunch-machine.gif" }
             ]
         };
 
