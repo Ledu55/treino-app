@@ -260,6 +260,32 @@
             color: white;
         }
 
+        .set-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .set-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .set-row .set-box {
+            flex: 0 0 auto;
+            min-width: 3rem;
+        }
+
+        .set-row .set-weight-input {
+            flex: 1.2;
+        }
+
+        .set-row .set-reps-input {
+            flex: 1;
+        }
+
         .rest-btn {
             width: 100%;
             padding: 0.75rem;
@@ -412,6 +438,19 @@
         .history-entry-body td:first-child { font-weight: 600; }
 
         .history-entry-body .entry-weight { color: var(--primary-dark); white-space: nowrap; }
+
+        .history-entry-body .entry-set {
+            display: block;
+            white-space: nowrap;
+            color: var(--primary-dark);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .history-entry-body .entry-set-miss {
+            color: var(--text-light);
+            font-weight: normal;
+        }
 
         .history-entry-body .entry-reps {
             color: var(--text-light);
@@ -617,6 +656,24 @@
             return workoutKey + '|' + nome;
         }
 
+        // Reparte o campo antigo de reps ("8, 8, 6") por série; valor único vale para todas
+        function legacyRepsFor(repsStr, w) {
+            if (!repsStr) return '';
+            const parts = String(repsStr).split(',').map((s) => s.trim()).filter(Boolean);
+            if (parts.length === 0) return '';
+            if (parts.length === 1) return parts[0];
+            return parts[w] || '';
+        }
+
+        // Valores da série w (0 = primeira série de trabalho); dados antigos servem de semente
+        function getSetValues(saved, w) {
+            const s = (saved.sets && saved.sets[w]) || {};
+            return {
+                weight: s.weight !== undefined ? s.weight : (saved.weight || ''),
+                reps: s.reps !== undefined ? s.reps : legacyRepsFor(saved.reps, w)
+            };
+        }
+
         function getSession(workoutKey) {
             if (!sessions[workoutKey]) {
                 sessions[workoutKey] = { startedAt: new Date().toISOString(), sets: {}, workoutNote: '' };
@@ -730,13 +787,24 @@
                 const savedSets = (session && session.sets && session.sets[ex.nome]) || [];
                 const totalSets = WARMUP_SETS + ex.series;
 
-                let setsHtml = '';
-                for (let i = 0; i < totalSets; i++) {
-                    const isWarmup = i < WARMUP_SETS;
-                    const label = isWarmup ? `Aquec. ${i + 1}` : `Série ${i - WARMUP_SETS + 1}`;
+                let warmupHtml = '';
+                for (let i = 0; i < WARMUP_SETS; i++) {
                     const active = savedSets[i] ? ' active' : '';
                     const pressed = savedSets[i] ? 'true' : 'false';
-                    setsHtml += `<button type="button" class="set-box${isWarmup ? ' warmup' : ''}${active}" data-set-index="${i}" aria-pressed="${pressed}" onclick="toggleSet(this)">${label}</button>`;
+                    warmupHtml += `<button type="button" class="set-box warmup${active}" data-set-index="${i}" aria-pressed="${pressed}" onclick="toggleSet(this)">Aquec. ${i + 1}</button>`;
+                }
+
+                let setRowsHtml = '';
+                for (let i = WARMUP_SETS; i < totalSets; i++) {
+                    const w = i - WARMUP_SETS;
+                    const active = savedSets[i] ? ' active' : '';
+                    const pressed = savedSets[i] ? 'true' : 'false';
+                    setRowsHtml += `
+                        <div class="set-row">
+                            <button type="button" class="set-box${active}" data-set-index="${i}" aria-pressed="${pressed}" aria-label="Série ${w + 1}" onclick="toggleSet(this)">S${w + 1}</button>
+                            <input type="text" class="field-input set-weight-input" data-working-index="${w}" placeholder="kg" inputmode="text" autocomplete="off">
+                            <input type="text" class="field-input set-reps-input" data-working-index="${w}" placeholder="reps" inputmode="text" autocomplete="off">
+                        </div>`;
                 }
 
                 card.innerHTML = `
@@ -753,14 +821,11 @@
                     <div class="exercise-info">
                         📊 ${ex.series} séries de ${ex.reps}
                     </div>
-                    <div class="field-row">
-                        <span class="field-label">🏋️ Carga</span>
-                        <input type="text" class="field-input weight-input" placeholder="ex: 20kg" inputmode="text" autocomplete="off">
-                        <span class="field-label">🔁 Reps</span>
-                        <input type="text" class="field-input reps-input" placeholder="ex: 12, 10" inputmode="text" autocomplete="off">
-                    </div>
                     <div class="sets-container">
-                        ${setsHtml}
+                        ${warmupHtml}
+                    </div>
+                    <div class="set-rows">
+                        ${setRowsHtml}
                     </div>
                     <button class="rest-btn" onclick="startTimer(${ex.descanso})">
                         ⏱️ Descanso (${formatTime(ex.descanso)})
@@ -773,21 +838,30 @@
                 const key = exerciseKey(treinoKey, ex.nome);
                 const saved = exerciseData[key] || {};
 
-                const weightInput = card.querySelector('.weight-input');
-                weightInput.value = saved.weight || '';
-                weightInput.addEventListener('input', debounce(() => {
-                    exerciseData[key] = exerciseData[key] || {};
-                    exerciseData[key].weight = weightInput.value.trim();
-                    saveExerciseData();
-                }, 300));
+                card.querySelectorAll('.set-row').forEach((row) => {
+                    const w = Number(row.querySelector('.set-weight-input').dataset.workingIndex);
+                    const vals = getSetValues(saved, w);
 
-                const repsInput = card.querySelector('.reps-input');
-                repsInput.value = saved.reps || '';
-                repsInput.addEventListener('input', debounce(() => {
-                    exerciseData[key] = exerciseData[key] || {};
-                    exerciseData[key].reps = repsInput.value.trim();
-                    saveExerciseData();
-                }, 300));
+                    const wIn = row.querySelector('.set-weight-input');
+                    wIn.value = vals.weight;
+                    wIn.addEventListener('input', debounce(() => {
+                        exerciseData[key] = exerciseData[key] || {};
+                        exerciseData[key].sets = exerciseData[key].sets || [];
+                        exerciseData[key].sets[w] = exerciseData[key].sets[w] || {};
+                        exerciseData[key].sets[w].weight = wIn.value.trim();
+                        saveExerciseData();
+                    }, 300));
+
+                    const rIn = row.querySelector('.set-reps-input');
+                    rIn.value = vals.reps;
+                    rIn.addEventListener('input', debounce(() => {
+                        exerciseData[key] = exerciseData[key] || {};
+                        exerciseData[key].sets = exerciseData[key].sets || [];
+                        exerciseData[key].sets[w] = exerciseData[key].sets[w] || {};
+                        exerciseData[key].sets[w].reps = rIn.value.trim();
+                        saveExerciseData();
+                    }, 300));
+                });
 
                 const noteInput = card.querySelector('.exercise-note-input');
                 noteInput.value = saved.note || '';
@@ -848,16 +922,19 @@
                 totalCount: exercises.length,
                 exercises: exercises.map((ex) => {
                     const saved = exerciseData[exerciseKey(currentWorkout, ex.nome)] || {};
-                    const sets = (session && session.sets && session.sets[ex.nome]) || [];
+                    const sessSets = (session && session.sets && session.sets[ex.nome]) || [];
+                    const sets = [];
                     let setsDone = 0;
-                    for (let i = WARMUP_SETS; i < WARMUP_SETS + ex.series; i++) {
-                        if (sets[i]) setsDone++;
+                    for (let w = 0; w < ex.series; w++) {
+                        const done = !!sessSets[WARMUP_SETS + w];
+                        if (done) setsDone++;
+                        const vals = getSetValues(saved, w);
+                        sets.push({ weight: vals.weight, reps: vals.reps, done: done });
                     }
                     return {
                         nome: ex.nome,
-                        weight: saved.weight || '',
-                        reps: saved.reps || '',
                         note: saved.note || '',
+                        sets: sets,
                         setsDone: setsDone,
                         setsTotal: ex.series
                     };
@@ -891,18 +968,22 @@
 
             list.innerHTML = workoutHistory.map((entry) => {
                 const rows = entry.exercises
-                    .filter((ex) => ex.setsDone > 0 || ex.weight || ex.reps || ex.note)
-                    .map((ex) => `
+                    .filter((ex) => ex.setsDone > 0 || ex.weight || ex.reps || ex.note
+                        || (Array.isArray(ex.sets) && ex.sets.some((s) => s.weight || s.reps || s.done)))
+                    .map((ex) => {
+                        const weightCell = Array.isArray(ex.sets)
+                            ? ex.sets.map((s, w) => `<span class="entry-set${s.done ? '' : ' entry-set-miss'}">${s.done ? '✓' : '·'} S${w + 1}: ${escapeHtml(s.weight || '—')}${s.reps ? ` × ${escapeHtml(s.reps)}` : ''}</span>`).join('')
+                            : `${escapeHtml(ex.weight)}${ex.reps ? `<br><span class="entry-reps">${escapeHtml(ex.reps)} reps</span>` : ''}`;
+                        return `
                         <tr>
                             <td>${escapeHtml(ex.nome)}<br>
                                 ${ex.note ? `<span class="entry-note">${escapeHtml(ex.note)}</span>` : ''}
                             </td>
-                            <td class="entry-weight">${escapeHtml(ex.weight)}
-                                ${ex.reps ? `<br><span class="entry-reps">${escapeHtml(ex.reps)} reps</span>` : ''}
-                            </td>
+                            <td class="entry-weight">${weightCell}</td>
                             <td>${ex.setsDone}/${ex.setsTotal}</td>
                         </tr>
-                    `).join('');
+                    `;
+                    }).join('');
 
                 return `
                     <details class="history-entry">
