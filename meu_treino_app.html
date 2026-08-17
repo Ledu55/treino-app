@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acompanhamento de Treino</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+            --success: #10b981;
+            --warmup: #f59e0b;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 90px;
+        }
+        
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 { margin: 0 0 10px 0; font-size: 1.5rem; }
+        
+        select {
+            padding: 0.6rem;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            border: none;
+            width: 90%;
+            max-width: 350px;
+            font-weight: bold;
+            color: var(--text);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 1.5rem auto;
+            padding: 0 1rem;
+        }
+        
+        .exercise-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .exercise-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 0 0 0.8rem 0;
+            color: var(--primary-dark);
+        }
+
+        .exercise-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background-color: #e5e7eb;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .exercise-info {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .sets-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-bottom: 1.2rem;
+        }
+        
+        .set-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.6rem 0.8rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            flex-grow: 1;
+            text-align: center;
+            font-family: inherit;
+            background-color: var(--card-bg);
+            color: var(--text);
+        }
+        
+        .set-box.warmup {
+            border-style: dashed;
+            color: var(--warmup);
+            border-color: var(--warmup);
+        }
+        
+        .set-box.warmup.active {
+            background-color: var(--warmup);
+            color: white;
+            border-style: solid;
+        }
+        
+        .set-box.active {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .rest-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: #f3f4f6;
+            color: var(--primary-dark);
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .rest-btn:hover { background-color: #e5e7eb; }
+        
+        #timer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--success);
+            color: white;
+            padding: 1.2rem 1.5rem;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.15);
+            transform: translateY(100%);
+            transition: transform 0.3s ease-in-out, background-color 0.3s;
+            z-index: 1000;
+        }
+        
+        #timer-bar.visible { transform: translateY(0); }
+        #timer-display { font-size: 1.8rem; font-weight: bold; letter-spacing: 2px; }
+        
+        #stop-timer {
+            background-color: white;
+            color: var(--success);
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 999px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        }
+        
+        #stop-timer:hover { background-color: #f3f4f6; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>💪 Meu Treino</h1>
+        <select id="workout-selector" aria-label="Escolher treino">
+            <option value="A">Treino A - Inferiores</option>
+            <option value="B">Treino B - Superiores</option>
+            <option value="C">Treino C - Inferiores 2</option>
+            <option value="D">Treino D - Superiores 2</option>
+        </select>
+    </header>
+    
+    <div class="container" id="workout-container"></div>
+
+    <div id="timer-bar" aria-live="assertive">
+        <span id="timer-display">0:00</span>
+        <button id="stop-timer" onclick="stopTimer()">Fechar / Parar</button>
+    </div>
+
+    <script>
+        const treinos = {
+            "A": [
+                { nome: "Extensão de Panturrilha esticada", series: 3, reps: "12 a 15", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/06/Standing-Calf-Raise.gif" },
+                { nome: "Cadeira Abdutora", series: 3, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/HiP-ABDUCTION-MACHINE.gif" },
+                { nome: "Cadeira Flexora", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/08/Seated-Leg-Curl.gif" },
+                { nome: "Agachamento", series: 3, reps: "6 a 8", descanso: 150, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/BARBELL-SQUAT.gif" },
+                { nome: "Stiff", series: 3, reps: "8 a 10", descanso: 120, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Romanian-Deadlift.gif" },
+                { nome: "Cadeira Extensora", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/LEG-EXTENSION.gif" }
+            ],
+            "B": [
+                { nome: "Supino inclinado maquina", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Incline-Chest-Press-Machine.gif" },
+                { nome: "Remada unilateral maquina", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Seated-Row-Machine.gif" },
+                { nome: "Elevação lateral", series: 3, reps: "10 a 12", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Lateral-Raise.gif" },
+                { nome: "Elevação frontal inclinada", series: 2, reps: "12 a 15", descanso: 60, img: "https://gymvisual.com/img/p/5/8/7/0/5870.gif" },
+                { nome: "Triceps frances", series: 2, reps: "8 a 10", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/06/Seated-Dumbbell-Triceps-Extension.gif" },
+                { nome: "Elevação de pernas", series: 3, reps: "12 a 15", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lying-Leg-Raise.gif" }
+            ],
+            "C": [
+                { nome: "Extensão de Panturrilha esticada", series: 3, reps: "12 a 15", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/06/Standing-Calf-Raise.gif" },
+                { nome: "Cadeira adutora", series: 2, reps: "12 a 15", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/HIP-ADDUCTION-MACHINE.gif" },
+                { nome: "Banco romano com peso", series: 3, reps: "10 a 12", descanso: 120, img: "https://fitnessprogramer.com/wp-content/uploads/2021/06/Weighted-Back-Extension.gif" },
+                { nome: "Leg press", series: 3, reps: "8 a 10", descanso: 150, img: "https://fitnessprogramer.com/wp-content/uploads/2015/11/Leg-Press.gif" },
+                { nome: "Búlgaro", series: 2, reps: "8 a 10", descanso: 120, img: "https://fitnessprogramer.com/wp-content/uploads/2021/05/Dumbbell-Bulgarian-Split-Squat.gif" },
+                { nome: "Cadeira flexora", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/08/Seated-Leg-Curl.gif" }
+            ],
+            "D": [
+                { nome: "Desenvolvimento na maquina", series: 3, reps: "8 a 10", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/04/Lever-Shoulder-Press.gif" },
+                { nome: "Puxador frontal", series: 3, reps: "8 a 10", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lat-Pulldown.gif" },
+                { nome: "Elevação lateral", series: 2, reps: "10 a 12", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Lateral-Raise.gif" },
+                { nome: "Crucifixo", series: 2, reps: "10 a 12", descanso: 90, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Fly.gif" },
+                { nome: "Rosca alternada", series: 2, reps: "10 a 12", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Curl.gif" },
+                { nome: "Abdominal maquina", series: 3, reps: "10 a 12", descanso: 60, img: "https://fitnessprogramer.com/wp-content/uploads/2022/10/Seated-Ab-Crunch-Machine.gif" }
+            ]
+        };
+
+        let audioCtx;
+        function getAudioCtx() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        let timerInterval;
+        let endTime;
+        let timerActive = false;
+        let wakeLock = null;
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        async function acquireWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                wakeLock = null;
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release().catch(() => {});
+                wakeLock = null;
+            }
+        }
+
+        function renderWorkout(treinoKey) {
+            const container = document.getElementById('workout-container');
+            container.innerHTML = ''; 
+            
+            const exercises = treinos[treinoKey];
+            
+            exercises.forEach((ex) => {
+                const card = document.createElement('div');
+                card.className = 'exercise-card';
+                
+                let setsHtml = `
+                    <button type="button" class="set-box warmup" aria-pressed="false" onclick="toggleSet(this)">Aquec. 1</button>
+                    <button type="button" class="set-box warmup" aria-pressed="false" onclick="toggleSet(this)">Aquec. 2</button>
+                `;
+                for (let i = 1; i <= ex.series; i++) {
+                    setsHtml += `<button type="button" class="set-box" aria-pressed="false" onclick="toggleSet(this)">Série ${i}</button>`;
+                }
+
+                card.innerHTML = `
+                    <h3 class="exercise-title">${ex.nome}</h3>
+                    <img src="${ex.img}" alt="Imagem do exercício ${ex.nome}" class="exercise-img" loading="lazy" onerror="this.src='https://placehold.co/600x300/e2e8f0/475569?text=Sem+Imagem'">
+
+                    <div class="exercise-info">
+                        📊 ${ex.series} séries de ${ex.reps}
+                    </div>
+                    <div class="sets-container">
+                        ${setsHtml}
+                    </div>
+                    <button class="rest-btn" onclick="startTimer(${ex.descanso})">
+                        ⏱️ Descanso (${formatTime(ex.descanso)})
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function toggleSet(element) {
+            const pressed = element.getAttribute('aria-pressed') === 'true';
+            element.setAttribute('aria-pressed', String(!pressed));
+            element.classList.toggle('active');
+        }
+
+        function startTimer(seconds) {
+            const ctx = getAudioCtx();
+            if (ctx.state === 'suspended') { ctx.resume(); }
+
+            clearInterval(timerInterval);
+            const timerBar = document.getElementById('timer-bar');
+
+            timerBar.classList.add('visible');
+            timerBar.style.backgroundColor = 'var(--success)';
+            document.getElementById('stop-timer').style.color = 'var(--success)';
+
+            endTime = Date.now() + seconds * 1000;
+            timerActive = true;
+            acquireWakeLock();
+            updateDisplay(seconds);
+
+            timerInterval = setInterval(() => {
+                const remaining = Math.round((endTime - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    updateDisplay(0);
+                    playAlarm();
+                } else {
+                    updateDisplay(remaining);
+                }
+            }, 1000);
+        }
+
+        function updateDisplay(seconds) {
+            document.getElementById('timer-display').innerText = formatTime(seconds);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerActive = false;
+            releaseWakeLock();
+            document.getElementById('timer-bar').classList.remove('visible');
+        }
+
+        function playAlarm() {
+            timerActive = false;
+            releaseWakeLock();
+
+            const timerBar = document.getElementById('timer-bar');
+            timerBar.style.backgroundColor = '#ef4444'; // Cor vermelha para alerta
+            document.getElementById('stop-timer').style.color = '#ef4444';
+            document.getElementById('timer-display').innerText = "Acabou!";
+
+            if ('vibrate' in navigator) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+            }
+
+            const ctx = getAudioCtx();
+            if (ctx.state === 'suspended') { ctx.resume(); }
+
+            for(let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+
+                    gainNode.gain.setValueAtTime(1, ctx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+
+                    oscillator.start();
+                    oscillator.stop(ctx.currentTime + 0.5);
+                }, i * 500);
+            }
+
+            setTimeout(() => {
+                if(document.getElementById('timer-display').innerText === "Acabou!") {
+                    stopTimer();
+                }
+            }, 5000);
+        }
+
+        // Catches up the timer if the tab/screen was backgrounded past the throttled interval.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && timerActive) {
+                const remaining = Math.round((endTime - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    updateDisplay(0);
+                    playAlarm();
+                } else {
+                    updateDisplay(remaining);
+                    acquireWakeLock();
+                }
+            }
+        });
+
+        document.getElementById('workout-selector').addEventListener('change', (e) => {
+            renderWorkout(e.target.value);
+        });
+
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+
+        window.onload = () => renderWorkout('A');
+    </script>
+</body>
+</html>
