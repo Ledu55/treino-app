@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -1250,16 +1250,49 @@
 
         // ---------- Backup na nuvem (Firebase) ----------
 
-        // Cole aqui o objeto firebaseConfig do app web (Console do Firebase → Configurações do projeto → Seus apps).
-        // Enquanto for null, a seção de backup fica escondida e o app funciona só com os dados do celular.
-        const FIREBASE_CONFIG = {
-            apiKey: "AIzaSyB_tGeQxXB0SUGIlVCOHKDbAQpZfUSuRac",
-            authDomain: "treino-app-21fcd.firebaseapp.com",
-            projectId: "treino-app-21fcd",
-            storageBucket: "treino-app-21fcd.firebasestorage.app",
-            messagingSenderId: "1012262948925",
-            appId: "1:1012262948925:web:e0ae7e5cd4b4e270631a54"
+        // Um projeto Firebase por ambiente. O objeto firebaseConfig vem do Console do Firebase →
+        // Configurações do projeto → Seus apps. Ambiente sem configuração: a seção de backup fica
+        // escondida e o app funciona só com os dados do celular.
+        const FIREBASE_CONFIGS = {
+            prod: {
+                apiKey: "AIzaSyB_tGeQxXB0SUGIlVCOHKDbAQpZfUSuRac",
+                authDomain: "treino-app-21fcd.firebaseapp.com",
+                projectId: "treino-app-21fcd",
+                storageBucket: "treino-app-21fcd.firebasestorage.app",
+                messagingSenderId: "1012262948925",
+                appId: "1:1012262948925:web:e0ae7e5cd4b4e270631a54"
+            },
+            // Projeto de desenvolvimento (treino-app-dev-306d2). Se for null, localhost usa o emulador.
+            dev: {
+                apiKey: "AIzaSyAdGCccw1ml7vlC7Dj5-eZNVB3zvDCEva8",
+                authDomain: "treino-app-dev-306d2.firebaseapp.com",
+                projectId: "treino-app-dev-306d2",
+                storageBucket: "treino-app-dev-306d2.firebasestorage.app",
+                messagingSenderId: "642701751250",
+                appId: "1:642701751250:web:8338a3a5e93efb94eb8e0b"
+            },
+            // Firebase Emulator (npm run emulators). Projetos "demo-" nunca acessam a nuvem.
+            emulator: {
+                apiKey: "demo-api-key",
+                authDomain: "demo-treino.firebaseapp.com",
+                projectId: "demo-treino"
+            }
         };
+        const EMULATOR_HOSTS = { auth: 'http://localhost:9099', firestore: ['localhost', 8080] };
+
+        // localhost usa o projeto de dev (ou o emulador, com ?emulator na URL ou sem projeto de dev);
+        // só o endereço publicado usa a produção; qualquer outro endereço fica sem nuvem.
+        function pickFirebaseEnv(loc) {
+            if (loc.hostname === 'ledu55.github.io') return 'prod';
+            if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') {
+                const wantsEmulator = new URLSearchParams(loc.search).has('emulator');
+                return wantsEmulator || !FIREBASE_CONFIGS.dev ? 'emulator' : 'dev';
+            }
+            return null;
+        }
+
+        const FIREBASE_ENV = pickFirebaseEnv(location);
+        const FIREBASE_CONFIG = FIREBASE_ENV ? FIREBASE_CONFIGS[FIREBASE_ENV] : null;
         const FIREBASE_SDK_VERSION = '10.14.1';
         const DELETED_IDS_LIMIT = 200;
 
@@ -1399,10 +1432,12 @@
             section.classList.toggle('cloud-on', !!cloud.user);
             signIn.hidden = !cloud.ready || !!cloud.user;
             signOut.hidden = !cloud.user;
+            // Fora da produção, o título mostra o ambiente para não haver confusão
+            const envTag = FIREBASE_ENV === 'prod' ? '' : ` [${FIREBASE_ENV}]`;
 
             if (!cloud.ready) {
                 icon.textContent = '☁️';
-                title.textContent = 'Backup na nuvem';
+                title.textContent = 'Backup na nuvem' + envTag;
                 detail.textContent = cloud.loadFailed
                     ? 'Sem conexão agora. Conecte-se à internet para ativar o backup.'
                     : 'Carregando…';
@@ -1411,13 +1446,13 @@
 
             if (!cloud.user) {
                 icon.textContent = '☁️';
-                title.textContent = 'Backup desativado';
+                title.textContent = 'Backup desativado' + envTag;
                 detail.textContent = 'Entre com sua conta Google para guardar seus treinos na nuvem. Assim nada se perde se trocar de celular.';
                 return;
             }
 
             icon.textContent = '✅';
-            title.textContent = 'Backup ativo';
+            title.textContent = 'Backup ativo' + envTag;
             let status;
             if (cloud.syncing) status = 'Salvando…';
             else if (!navigator.onLine && cloudMeta.dirty) status = 'Sem internet. O backup será feito quando a conexão voltar.';
@@ -1453,7 +1488,13 @@
             renderCloudStatus();
             try {
                 await loadFirebaseSdk();
-                if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG);
+                    if (FIREBASE_ENV === 'emulator') {
+                        firebase.auth().useEmulator(EMULATOR_HOSTS.auth);
+                        firebase.firestore().useEmulator(...EMULATOR_HOSTS.firestore);
+                    }
+                }
                 cloud.db = firebase.firestore();
             } catch (err) {
                 cloud.loadFailed = true;

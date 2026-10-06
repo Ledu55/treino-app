@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "treino-app-dev-306d2",
+    "dev": "treino-app-dev-306d2",
+    "prod": "treino-app-21fcd"
+  }
+}
