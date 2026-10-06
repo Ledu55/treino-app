@@ -10,14 +10,14 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): um documento por usuário em `users/{uid}`, sincronizado com `mergeCloudData`.
-- Sem testes automáticos no repositório e sem ferramenta de build.
+- Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions; ainda sem ferramenta de build.
 
 ## Princípios
 
 1. **O app funciona sem internet.** O celular é a fonte principal dos dados e a nuvem é backup/sincronização. Nenhuma tela pode impedir o registro de um treino por falta de conexão ou de login.
 2. **Os dados são do aluno.** Fichas e histórico pertencem a quem treina. Um personal só tem acesso autorizado pelo aluno, e o aluno pode revogar esse acesso a qualquer momento.
 3. **Nunca perder dados.** Toda mudança no formato dos dados vem com uma migração testada. Mudanças grandes são testadas primeiro no projeto Firebase de desenvolvimento.
-4. **Simplicidade.** Sem build e sem framework até que um problema concreto justifique.
+4. **Simplicidade.** Delegar o que é infraestrutura repetitiva (build, cache do service worker) a ferramentas prontas e manter o código do app pequeno. Dependência nova só quando resolve um problema concreto. (Antes era "sem build"; mudou com a Fase 1, porque Node e CI já existem e o item 4 é justamente o problema concreto que um build resolve.)
 
 **Legenda:** 🧱 estrutura · ✨ funcionalidade
 
@@ -54,29 +54,36 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 ## Fase 2: reorganizar o código
 
-### 3. 🧱 Dividir o arquivo único em módulos
+### 3. 🧱 Vite + dividir o arquivo único em módulos
 
-**Por quê:** 1.500 linhas num só arquivo dificultam manutenção, testes e o editor de treinos.
+**Por quê:** 1.500 linhas num só arquivo dificultam manutenção, testes e o editor de treinos. O Vite junta os módulos, gera nomes de arquivo com hash e, com o `vite-plugin-pwa`, também gera o service worker (item 4).
 
-- [ ] Separar o CSS em `css/app.css`.
-- [ ] Separar o JS em módulos nativos do navegador (`<script type="module">`), sem build. Sugestão de divisão:
-  - `js/storage.js`: leitura/gravação local
-  - `js/progression.js`: sugestão de carga
-  - `js/cloud.js`: Firebase e sincronização
-  - `js/timer.js`: descanso e alarme
-  - `js/ui/*.js`: renderização das telas
-- [ ] Trocar os `onclick="..."` do HTML por `addEventListener` (funções de módulo não são globais).
-- [ ] Renomear `meu_treino_app.html` para `index.html`, mantendo um redirecionamento no nome antigo para quem já tem o app instalado.
+- [x] **Decisão:** interface em **Preact** (JSX + hooks, via `@preact/preset-vite`). Decidido antes da divisão para que as telas não sejam escritas duas vezes; o estado em árvore do editor do item 7 (fichas → treinos → exercícios → séries) é onde ele mais ajuda.
+- [ ] Adotar o Vite: `npm run dev` para desenvolver, `npm run build` gera `dist/`, com `base: '/treino-app/'` para o GitHub Pages.
+- [ ] Publicar pelo GitHub Actions (build + `actions/deploy-pages`) em vez de servir a branch direto. Passo manual: em Settings → Pages, mudar a origem para "GitHub Actions".
+- [ ] Separar o CSS em `src/app.css`.
+- [ ] Separar o JS em módulos. Sugestão de divisão:
+  - `src/storage.js`: leitura/gravação local
+  - `src/progression.js`: sugestão de carga
+  - `src/cloud.js`: Firebase e sincronização (o SDK passa a vir do npm em vez do gstatic, ainda carregado sob demanda com `import()`)
+  - `src/timer.js`: descanso e alarme
+  - `src/ui/*.jsx`: telas como componentes Preact
+- [ ] Reescrever a renderização em componentes Preact, o que também elimina os `onclick="..."` do HTML. As regras de cálculo (`storage`, `progression`, `cloud`, `timer`) ficam em JS puro, sem depender do Preact, para continuarem testáveis isoladamente.
+- [ ] Manter os mesmos textos, classes CSS e atributos usados pelos testes de ponta a ponta, para que eles provem que nada mudou.
+- [ ] Renomear `meu_treino_app.html` para `index.html`, mantendo um redirecionamento no nome antigo (em `public/`) para quem já tem o app instalado.
+- [ ] Testes: os de unidade importam os módulos direto, em vez de carregar o HTML no jsdom; os de ponta a ponta rodam contra o build (`vite preview`), que é o que vai para o celular.
+- [ ] Não melhorar a sincronização atual aqui: este item só move código. A sincronização é refeita no item 6.
 
-**Pronto quando:** o app se comporta exatamente igual e todos os testes do item 2 passam.
+**Pronto quando:** o app publicado se comporta exatamente igual e todos os testes do item 2 passam contra o build.
 
 ### 4. 🧱 Atualização automática do app
 
 **Por quê:** hoje é preciso lembrar de subir `CACHE_VERSION` em [sw.js](sw.js) a cada mudança; com vários arquivos, esquecer fica mais fácil e o celular fica com uma versão misturada.
 
-- [ ] Gerar a versão do cache automaticamente (script ou GitHub Action que grava o hash do commit no `sw.js`).
-- [ ] Gerar a lista de arquivos do cache automaticamente.
-- [ ] Mostrar no app o aviso "Nova versão disponível — Atualizar" quando o service worker novo estiver pronto.
+- [ ] Gerar o service worker com o `vite-plugin-pwa` (Workbox): versão e lista de arquivos saem do build, e o `sw.js` manual é removido.
+- [ ] Manter o nome `sw.js` e o mesmo escopo, para que o service worker já instalado no celular seja substituído pelo novo e não fique um antigo servindo cache velho.
+- [ ] Mostrar no app o aviso "Nova versão disponível — Atualizar" quando o service worker novo estiver pronto (`registerType: 'prompt'`).
+- [ ] Teste de ponta a ponta: servir dois builds seguidos e verificar que o aviso aparece e que a página atualiza.
 
 **Pronto quando:** um push no `main` chega ao celular sem edição manual de versão, e o usuário vê o aviso de atualização.
 
@@ -104,7 +111,7 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 **Firestore:**
 
 ```
-users/{uid}                    perfil: nome, isTrainer, trainers: { trainerUid: true }, schemaVersion
+users/{uid}                    perfil: nome, isTrainer, trainers: { trainerUid: true }, lastSessionAt, schemaVersion
 users/{uid}/plans/{planId}     ficha: nome, treinos[{ id, nome, exercícios[{ exerciseId, séries, reps, descanso, obs }] }],
                                createdBy, updatedBy, updatedAt, ativa
 users/{uid}/sessions/{id}      treino finalizado: data, planId, workoutId, exercícios[{ exerciseId, séries[{ kg, reps, feita }] }], obs
@@ -119,7 +126,13 @@ invites/{codigo}               convite de personal: trainerUid, expiresAt
   - um personal listado em `trainers` pode ler o perfil, ler o histórico e editar fichas, mas não pode apagar treinos nem alterar o perfil;
   - só o próprio aluno grava a lista `trainers`.
 - [ ] Migração dos dados atuais: a ficha A/B/C/D vira a primeira ficha da usuária atual, e o histórico e os últimos valores passam para os novos ids. A sugestão de carga e o histórico devem continuar aparecendo iguais.
-- [ ] Armazenamento local: avaliar trocar `localStorage` (limite ~5 MB) por IndexedDB, já que o histórico deixa de ter limite.
+- [ ] `lastSessionAt` no perfil, atualizado ao finalizar um treino, para a lista de alunos do personal (item 12) não precisar de uma consulta por aluno. O personal lista os alunos com `where('trainers.<uid>', '==', true)` em `users`.
+- [ ] **Decisão: armazenamento local.** O histórico deixa de ter limite, e o `localStorage` tem ~5 MB. Antes de decidir, fazer um teste rápido da opção 3:
+  1. `localStorage` (como hoje) + sincronização própria;
+  2. IndexedDB + sincronização própria;
+  3. cache offline do Firestore (`persistentLocalCache`) como único banco, com login anônimo vinculado depois à conta Google (`linkWithPopup`). Elimina o `mergeCloudData` e a fila de envio própria.
+
+  Pontos a verificar na opção 3: o primeiro acesso sem internet (o login anônimo precisa de rede, e o princípio 1 não pode ser quebrado); o cache configurado sem limite (`CACHE_SIZE_UNLIMITED`), para não perder dados por coleta de lixo; transações não funcionam offline; "última gravação vence" por campo nas fichas; o peso do SDK na primeira abertura; o treino em andamento continua só local.
 - [ ] Adaptar `computeSuggestion` e a sincronização ao novo formato.
 
 **Pronto quando:** a usuária atual abre o app depois da atualização e tudo está igual, com os dados já no novo formato no celular e na nuvem.
@@ -129,8 +142,8 @@ invites/{codigo}               convite de personal: trainerUid, expiresAt
 - [ ] Criar, renomear, duplicar e apagar fichas; escolher a ficha ativa.
 - [ ] Dentro da ficha: criar treinos, reordenar e escolher exercícios da biblioteca com busca, além de definir séries, faixa de reps, descanso e observações.
 - [ ] Modelos prontos (a ficha A/B/C/D atual vira o primeiro modelo).
+- [ ] Reordenar com botões ↑/↓ (arrastar e soltar é opcional, só se fizer falta no uso).
 - [ ] Componentes do editor reaproveitáveis pelo modo personal (item 12).
-- [ ] **Decisão:** continuar em JS puro ou adotar uma biblioteca leve de interface (ex.: Preact + htm ou Lit, ambos sem build). Decidir ao começar este item, quando o tamanho do estado do editor estiver claro.
 
 **Pronto quando:** uma pessoa nova consegue montar a própria ficha do zero no celular sem ajuda.
 
@@ -177,17 +190,21 @@ invites/{codigo}               convite de personal: trainerUid, expiresAt
 
 - [ ] Ativar o perfil de personal numa conta.
 - [ ] O personal gera um código de convite com validade; o aluno digita o código e confirma o acesso.
-- [ ] Lista de alunos do personal, com o último treino de cada um.
+- [ ] Lista de alunos do personal, com o último treino de cada um (`lastSessionAt`).
 - [ ] Editar a ficha de um aluno com o mesmo editor do item 7.
+- [ ] Para o aluno, a ficha montada pelo personal é só leitura na estrutura (exercícios, séries, reps, descanso); cargas e reps continuam sendo registradas normalmente. Para mudar a estrutura, o aluno usa "Duplicar ficha" e a cópia passa a ser dele. Garantido pelas regras do Firestore via `createdBy`.
 - [ ] Ver o histórico e os gráficos do aluno.
 - [ ] Aviso para o aluno: "Ficha atualizada pelo seu personal".
 - [ ] O aluno vê quem tem acesso e pode remover.
-- [ ] Testes das regras: personal autorizado, personal removido e personal sem vínculo.
-- [ ] **Decisão:** o aluno pode alterar uma ficha montada pelo personal ou só fazer uma cópia? (O modelo de dados funciona com qualquer uma das duas respostas, via `createdBy`.)
+- [ ] Testes das regras: personal autorizado, personal removido, personal sem vínculo e aluno tentando alterar a estrutura de uma ficha do personal.
 
 ### 13. ✨ Refinamentos
 
-- [ ] Alerta do timer com a tela desligada (vibração/notificação). Ela continua iniciando o timer manualmente; iniciar o timer automaticamente foi recusado.
+- [ ] Timer de descanso confiável. Ela continua iniciando o timer manualmente; iniciar o timer automaticamente foi recusado.
+  - Manter a tela ligada durante o treino com a Wake Lock API (pedir de novo quando o app volta ao primeiro plano).
+  - Calcular o timer pela hora de término, não por contagem de ticks, para ele estar certo ao voltar ao app.
+  - Avisar na interface que o alarme depende da tela ligada.
+  - Alarme com a tela desligada fica fora: tanto o Android quanto o iOS suspendem o JavaScript em segundo plano, e um aviso confiável exigiria push vindo de um servidor. Reavaliar só se fizer falta no uso.
 - [ ] Outros ajustes conforme o uso.
 
 ---
@@ -200,10 +217,13 @@ invites/{codigo}               convite de personal: trainerUid, expiresAt
 | Backup | Firebase com login Google, sincronização automática |
 | Página de login | Não bloqueia o app; o login entra no primeiro acesso (item 8) e continua opcional |
 | Quem monta as fichas | Os dois: cada pessoa e, opcionalmente, um personal autorizado pelo aluno |
+| Build | Vite + `vite-plugin-pwa`, publicado no GitHub Pages pelo GitHub Actions (item 3) |
+| Interface | Preact (JSX + hooks); regras de cálculo em JS puro, fora dos componentes |
+| Ficha montada pelo personal | Só leitura na estrutura para o aluno, que registra cargas normalmente e pode duplicar a ficha para ter uma cópia própria |
+| Timer com a tela desligada | Fora do escopo; manter a tela ligada com Wake Lock (item 13) |
+| Ordem das fases | A reestruturação (item 3) continua separada do novo modelo de dados (item 6), para os testes garantirem que nada mudou |
 | Recusados | Iniciar o timer de descanso automaticamente; modo escuro |
 
 ## Decisões em aberto
 
-- JS puro ou biblioteca leve de interface (item 7).
-- Aluno pode ou não alterar uma ficha montada pelo personal (item 12).
-- `localStorage` ou IndexedDB para os dados locais (item 6).
+- Armazenamento local: `localStorage`, IndexedDB ou cache offline do Firestore com login anônimo (item 6, depois de um teste rápido).
