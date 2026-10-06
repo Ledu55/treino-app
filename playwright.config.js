@@ -9,7 +9,7 @@ export default defineConfig({
     retries: process.env.CI ? 1 : 0,
     reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
-        baseURL: `http://localhost:${PORT}/`,
+        baseURL: `http://localhost:${PORT}/treino-app/`,
         // O service worker guardaria versões antigas entre os testes
         serviceWorkers: 'block',
         trace: 'retain-on-failure'
@@ -17,9 +17,10 @@ export default defineConfig({
     projects: [
         { name: 'celular', use: { ...devices['Pixel 7'] } }
     ],
+    // Testa o build, que é o que vai para o celular
     webServer: {
-        command: `node scripts/serve.mjs ${PORT}`,
-        url: `http://localhost:${PORT}/meu_treino_app.html`,
+        command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
+        url: `http://localhost:${PORT}/treino-app/meu_treino_app.html`,
         reuseExistingServer: !process.env.CI
     }
 });

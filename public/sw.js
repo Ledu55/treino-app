@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'meu-treino-v8';
+const CACHE_VERSION = 'meu-treino-v9';
 const RUNTIME_CACHE = 'meu-treino-runtime-v1';
 
 const EXERCISE_GIFS = [

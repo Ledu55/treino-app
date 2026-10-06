@@ -13,11 +13,15 @@ npx playwright install chromium   # uma vez
 
 | Comando | O que faz |
 |---|---|
-| `npm start` | Serve o app em http://localhost:8000/meu_treino_app.html |
+| `npm start` | Servidor de desenvolvimento (Vite) em http://localhost:8000/treino-app/meu_treino_app.html |
+| `npm run build` | Gera a versão publicada em `dist/` |
+| `npm run preview` | Serve o `dist/` para conferir o build |
 | `npm run emulators` | Sobe o Firebase Emulator (login, Firestore e painel em http://localhost:4000) |
 | `npm test` | Sobe o emulador, roda todos os testes e desliga o emulador |
 | `npm run test:unit` | Só os testes de unidade (não precisam do emulador) |
 | `npm run test:e2e` | Só os testes de ponta a ponta (o de nuvem é pulado sem o emulador) |
+
+Arquivos estáticos (GIFs, ícones, manifest, `sw.js`) ficam em [public/](public/) e são copiados sem alteração para o build. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
 
 ### Qual Firebase o app usa
 

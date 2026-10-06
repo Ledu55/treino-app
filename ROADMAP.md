@@ -59,8 +59,8 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 **Por quê:** 1.500 linhas num só arquivo dificultam manutenção, testes e o editor de treinos. O Vite junta os módulos, gera nomes de arquivo com hash e, com o `vite-plugin-pwa`, também gera o service worker (item 4).
 
 - [x] **Decisão:** interface em **Preact** (JSX + hooks, via `@preact/preset-vite`). Decidido antes da divisão para que as telas não sejam escritas duas vezes; o estado em árvore do editor do item 7 (fichas → treinos → exercícios → séries) é onde ele mais ajuda.
-- [ ] Adotar o Vite: `npm run dev` para desenvolver, `npm run build` gera `dist/`, com `base: '/treino-app/'` para o GitHub Pages.
-- [ ] Publicar pelo GitHub Actions (build + `actions/deploy-pages`) em vez de servir a branch direto. Passo manual: em Settings → Pages, mudar a origem para "GitHub Actions".
+- [x] Adotar o Vite: `npm start` para desenvolver, `npm run build` gera `dist/`, com `base: '/treino-app/'` para o GitHub Pages. Estáticos (GIFs, ícones, manifest, `sw.js`) em `public/`; por enquanto o `meu_treino_app.html` entra no build como está, e os testes de ponta a ponta já rodam contra o build.
+- [x] Publicar pelo GitHub Actions (build + `actions/deploy-pages`) em vez de servir a branch direto. Passo manual: em Settings → Pages, mudar a origem para "GitHub Actions".
 - [ ] Separar o CSS em `src/app.css`.
 - [ ] Separar o JS em módulos. Sugestão de divisão:
   - `src/storage.js`: leitura/gravação local
