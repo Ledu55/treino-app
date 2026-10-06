@@ -186,6 +186,43 @@
             gap: 0.5rem;
         }
 
+        .suggestion {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.4rem 0.6rem;
+            font-size: 0.85rem;
+            line-height: 1.35;
+            padding: 0.55rem 0.7rem;
+            margin-bottom: 0.8rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: var(--bg);
+            color: var(--text);
+        }
+
+        .suggestion-text { flex: 1 1 12rem; min-width: 0; }
+        .suggestion-text strong { white-space: nowrap; }
+
+        .suggestion-up { border-color: rgba(16, 185, 129, 0.45); background-color: var(--success-bg); }
+        .suggestion-up strong { color: #047857; }
+        .suggestion-down { border-color: rgba(245, 158, 11, 0.5); background-color: #fffbeb; }
+        .suggestion-down strong { color: #b45309; }
+
+        .suggestion-apply {
+            flex-shrink: 0;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.35rem 0.8rem;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background-color: #ffffff;
+            color: var(--primary-dark);
+            cursor: pointer;
+        }
+
+        .suggestion-apply:active { background-color: var(--primary); color: #ffffff; }
+
         .field-row {
             display: flex;
             align-items: center;
@@ -489,6 +526,61 @@
             cursor: pointer;
         }
 
+        [hidden] { display: none !important; }
+
+        .cloud-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            margin-bottom: 1rem;
+            padding: 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background-color: var(--card-bg);
+        }
+
+        .cloud-section.cloud-on { border-color: rgba(16, 185, 129, 0.45); }
+
+        .cloud-status { display: flex; gap: 0.6rem; align-items: flex-start; }
+        .cloud-status-icon { font-size: 1.3rem; line-height: 1.2; }
+        .cloud-status-title { font-weight: 700; font-size: 0.95rem; }
+
+        .cloud-status-detail {
+            margin: 0.15rem 0 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--text-light);
+            overflow-wrap: anywhere;
+            white-space: pre-line;
+        }
+
+        .cloud-signin-btn {
+            padding: 0.75rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: #ffffff;
+            color: var(--text);
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        }
+
+        .cloud-signin-btn:active { transform: scale(0.98); }
+
+        .cloud-signout-btn {
+            align-self: flex-start;
+            padding: 0;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 0.8rem;
+            font-family: inherit;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
         #timer-bar {
             position: fixed;
             bottom: 0;
@@ -584,6 +676,18 @@
                 <div id="history-list"></div>
             </details>
         </div>
+
+        <div class="cloud-section" id="cloud-section" hidden>
+            <div class="cloud-status">
+                <span class="cloud-status-icon" id="cloud-icon" aria-hidden="true">☁️</span>
+                <div>
+                    <div class="cloud-status-title" id="cloud-title">Backup na nuvem</div>
+                    <p class="cloud-status-detail" id="cloud-detail">Carregando…</p>
+                </div>
+            </div>
+            <button type="button" class="cloud-signin-btn" id="cloud-signin" onclick="cloudSignIn()" hidden>Entrar com Google</button>
+            <button type="button" class="cloud-signout-btn" id="cloud-signout" onclick="cloudSignOut()" hidden>Sair da conta</button>
+        </div>
     </div>
 
     <div id="timer-bar" aria-live="assertive">
@@ -607,9 +711,9 @@
             "B": [
                 { nome: "Supino Inclinado Máquina", series: 2, reps: "10 a 12 repetições", descanso: 90, img: "gifs/incline-chest-press-machine.gif", instrucoes: "Sentada no banco inclinado, empurre os handles para cima/frente até quase estender os braços e retorne controlando a descida." },
                 { nome: "Remada Unilateral Máquina", series: 2, reps: "10 a 12 repetições", descanso: 90, img: "gifs/seated-row-machine.gif", instrucoes: "Sentada, puxe o handle em direção ao tronco contraindo as costas, um braço de cada vez, controlando a volta." },
-                { nome: "Elevação Lateral", series: 3, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif", instrucoes: "Em pé, com halteres ao lado do corpo, eleve os braços lateralmente até a altura dos ombros, cotovelos levemente flexionados, e desça devagar." },
-                { nome: "Elevação Frontal Inclinada", series: 2, reps: "12 a 15 repetições", descanso: 60, img: "gifs/elevacao-frontal-inclinada.gif", instrucoes: "Apoiada no banco inclinado, eleve os halteres à frente até a altura dos ombros e retorne controladamente." },
-                { nome: "Triceps Francês", series: 2, reps: "8 a 10 repetições", descanso: 60, img: "gifs/seated-dumbbell-triceps-extension.gif", instrucoes: "Sentada, segure o halter atrás da cabeça com os dois braços e estenda os cotovelos elevando o peso, controlando a descida." },
+                { nome: "Elevação Lateral", incremento: 1, series: 3, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif", instrucoes: "Em pé, com halteres ao lado do corpo, eleve os braços lateralmente até a altura dos ombros, cotovelos levemente flexionados, e desça devagar." },
+                { nome: "Elevação Frontal Inclinada", incremento: 1, series: 2, reps: "12 a 15 repetições", descanso: 60, img: "gifs/elevacao-frontal-inclinada.gif", instrucoes: "Apoiada no banco inclinado, eleve os halteres à frente até a altura dos ombros e retorne controladamente." },
+                { nome: "Triceps Francês", incremento: 1, series: 2, reps: "8 a 10 repetições", descanso: 60, img: "gifs/seated-dumbbell-triceps-extension.gif", instrucoes: "Sentada, segure o halter atrás da cabeça com os dois braços e estenda os cotovelos elevando o peso, controlando a descida." },
                 { nome: "Elevação de Pernas", series: 3, reps: "12 a 15 repetições", descanso: 60, img: "gifs/lying-leg-raise.gif", instrucoes: "Deitada, com as pernas esticadas, eleve-as até formar um ângulo de 90° com o tronco e desça sem tocar o chão." }
             ],
             "C": [
@@ -617,21 +721,22 @@
                 { nome: "Cadeira Adutora", series: 2, reps: "12 a 15 repetições", descanso: 90, img: "gifs/hip-adduction-machine.gif", instrucoes: "Sentada, com as pernas apoiadas nas almofadas, aproxime as pernas contra a resistência e retorne devagar." },
                 { nome: "Banco Romano com Peso", series: 3, reps: "10 a 12 repetições", descanso: 120, img: "gifs/weighted-back-extension.gif", instrucoes: "Deitada de bruços no banco com o quadril apoiado, segure o peso e flexione o tronco para baixo, retornando até alinhar com as pernas." },
                 { nome: "Leg Press", series: 3, reps: "8 a 10 repetições", descanso: 150, img: "gifs/leg-press.gif", instrucoes: "Sentada no aparelho, empurre a plataforma estendendo os joelhos sem travá-los totalmente e retorne controlando a descida." },
-                { nome: "Búlgaro", series: 2, reps: "8 a 10 repetições", descanso: 120, img: "gifs/dumbbell-bulgarian-split-squat.gif", instrucoes: "Com um pé apoiado atrás em um banco e halteres nas mãos, flexione o joelho da frente descendo até quase 90° e suba." },
+                { nome: "Búlgaro", incremento: 1, series: 2, reps: "8 a 10 repetições", descanso: 120, img: "gifs/dumbbell-bulgarian-split-squat.gif", instrucoes: "Com um pé apoiado atrás em um banco e halteres nas mãos, flexione o joelho da frente descendo até quase 90° e suba." },
                 { nome: "Cadeira Flexora", series: 2, reps: "10 a 12 repetições", descanso: 90, img: "gifs/seated-leg-curl.gif", instrucoes: "Flexione os joelhos trazendo o calcanhar em direção ao glúteo contra a resistência e retorne controlando o movimento." }
             ],
             "D": [
                 { nome: "Desenvolvimento de Ombros", series: 3, reps: "8 a 10 repetições", descanso: 90, img: "gifs/lever-shoulder-press.gif", instrucoes: "Sentada, empurre os pegadores para cima até quase estender os braços acima da cabeça e desça controladamente. Também pode ser feito com halteres." },
                 { nome: "Puxador Frontal", series: 3, reps: "8 a 10 repetições", descanso: 90, img: "gifs/lat-pulldown.gif", instrucoes: "Sentada, puxe a barra em direção à parte superior do peito contraindo as costas e retorne controlando a subida." },
-                { nome: "Elevação Lateral", series: 2, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif", instrucoes: "Em pé, com halteres ao lado do corpo, eleve os braços lateralmente até a altura dos ombros, cotovelos levemente flexionados, e desça devagar." },
-                { nome: "Crucifixo", series: 2, reps: "10 a 12 repetições", descanso: 90, img: "gifs/dumbbell-fly.gif", instrucoes: "Deitada no banco com halteres, abra os braços lateralmente em arco até sentir alongamento no peito e retorne unindo-os acima do corpo." },
-                { nome: "Rosca Alternada", series: 2, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-curl.gif", instrucoes: "Em pé ou sentada, flexione o cotovelo elevando o halter até o ombro, alternando os braços, e desça controladamente." },
+                { nome: "Elevação Lateral", incremento: 1, series: 2, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-lateral-raise.gif", instrucoes: "Em pé, com halteres ao lado do corpo, eleve os braços lateralmente até a altura dos ombros, cotovelos levemente flexionados, e desça devagar." },
+                { nome: "Crucifixo", incremento: 1, series: 2, reps: "10 a 12 repetições", descanso: 90, img: "gifs/dumbbell-fly.gif", instrucoes: "Deitada no banco com halteres, abra os braços lateralmente em arco até sentir alongamento no peito e retorne unindo-os acima do corpo." },
+                { nome: "Rosca Alternada", incremento: 1, series: 2, reps: "10 a 12 repetições", descanso: 60, img: "gifs/dumbbell-curl.gif", instrucoes: "Em pé ou sentada, flexione o cotovelo elevando o halter até o ombro, alternando os braços, e desça controladamente." },
                 { nome: "Abdominal Máquina", series: 3, reps: "10 a 12 repetições", descanso: 60, img: "gifs/seated-ab-crunch-machine.gif", instrucoes: "Sentada, flexione o tronco contraindo o abdômen contra a resistência e retorne controlando o movimento." }
             ]
         };
 
         const WARMUP_SETS = 2;
         const HISTORY_LIMIT = 50;
+        const DEFAULT_INCREMENT = 2.5;
 
         // ---------- Persistência (localStorage) ----------
 
@@ -656,6 +761,11 @@
         let sessions = storageGet('treino.session', {});
         let workoutHistory = storageGet('treino.history', []);
         if (!Array.isArray(workoutHistory)) workoutHistory = [];
+        // Ids de treinos apagados, para que o backup não os traga de volta
+        let deletedIds = storageGet('treino.deletedIds', []);
+        if (!Array.isArray(deletedIds)) deletedIds = [];
+        // { dirty, lastSyncAt, exerciseDataUpdatedAt }
+        let cloudMeta = storageGet('treino.cloudMeta', {});
 
         let currentWorkout = 'A';
 
@@ -681,6 +791,96 @@
             };
         }
 
+        // ---------- Sugestão de carga (progressão dupla) ----------
+
+        function parseRepRange(repsStr) {
+            const m = /(\d+)\s*a\s*(\d+)/.exec(repsStr || '');
+            return m ? { min: Number(m[1]), max: Number(m[2]) } : null;
+        }
+
+        // Primeiro número de um texto livre ("22,5kg" → 22.5); NaN se não houver
+        function parseNumber(str) {
+            const m = /\d+(?:[.,]\d+)?/.exec(String(str || ''));
+            return m ? Number(m[0].replace(',', '.')) : NaN;
+        }
+
+        function formatKg(n) {
+            return n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' kg';
+        }
+
+        // Séries de trabalho de um exercício do histórico, aceitando o formato antigo
+        function historySetsFor(entryEx) {
+            if (Array.isArray(entryEx.sets)) return entryEx.sets;
+            const allDone = entryEx.setsDone >= entryEx.setsTotal;
+            const sets = [];
+            for (let w = 0; w < (entryEx.setsTotal || 0); w++) {
+                sets.push({ weight: entryEx.weight || '', reps: legacyRepsFor(entryEx.reps, w), done: allDone });
+            }
+            return sets;
+        }
+
+        // Resume uma sessão: carga de referência (maior carga) e se bateu o topo / falhou
+        function evaluateSession(sets, ex, range) {
+            const weights = sets.map((s) => parseNumber(s.weight)).filter((n) => !isNaN(n) && n > 0);
+            if (weights.length === 0) return null;
+            const done = sets.slice(0, ex.series).filter((s) => s.done);
+            const reps = done.map((s) => parseNumber(s.reps));
+            const allDone = done.length >= ex.series;
+            return {
+                weight: Math.max(...weights),
+                hitTop: allDone && reps.length > 0 && reps.every((r) => r >= range.max),
+                failed: done.length < ex.series / 2 || reps.some((r) => !isNaN(r) && r < range.min)
+            };
+        }
+
+        function computeSuggestion(workoutKey, ex) {
+            const range = parseRepRange(ex.reps);
+            if (!range) return null;
+            const inc = ex.incremento || DEFAULT_INCREMENT;
+
+            const recent = [];
+            for (const entry of workoutHistory) {
+                if (entry.workout !== workoutKey || !Array.isArray(entry.exercises)) continue;
+                const entryEx = entry.exercises.find((e) => e.nome === ex.nome);
+                if (!entryEx) continue;
+                const result = evaluateSession(historySetsFor(entryEx), ex, range);
+                if (result) recent.push(result);
+                if (recent.length === 2) break;
+            }
+            if (recent.length === 0) return null;
+
+            const last = recent[0];
+            if (last.hitTop) {
+                return {
+                    action: 'up',
+                    weight: last.weight + inc,
+                    message: `você fez ${range.max}+ reps em todas as séries — hora de subir!`
+                };
+            }
+            if (last.failed && recent[1] && recent[1].failed && recent[1].weight === last.weight) {
+                const deload = Math.max(inc, Math.round((last.weight * 0.9) / inc) * inc);
+                if (deload < last.weight) {
+                    return {
+                        action: 'down',
+                        weight: deload,
+                        message: `2 treinos seguidos abaixo de ${range.min} reps — reduza um pouco e suba de novo.`
+                    };
+                }
+            }
+            if (last.failed) {
+                return {
+                    action: 'keep',
+                    weight: last.weight,
+                    message: `mantenha e busque o mínimo de ${range.min} reps em cada série.`
+                };
+            }
+            return {
+                action: 'keep',
+                weight: last.weight,
+                message: `mantenha e tente +1 rep até chegar a ${range.max} em todas.`
+            };
+        }
+
         function getSession(workoutKey) {
             if (!sessions[workoutKey]) {
                 sessions[workoutKey] = { startedAt: new Date().toISOString(), sets: {}, workoutNote: '' };
@@ -689,8 +889,15 @@
         }
 
         function saveSessions() { storageSet('treino.session', sessions); }
-        function saveExerciseData() { storageSet('treino.exerciseData', exerciseData); }
-        function saveHistory() { storageSet('treino.history', workoutHistory); }
+        function saveExerciseData() {
+            storageSet('treino.exerciseData', exerciseData);
+            cloudMeta.exerciseDataUpdatedAt = Date.now();
+            markCloudDirty();
+        }
+        function saveHistory() {
+            storageSet('treino.history', workoutHistory);
+            markCloudDirty();
+        }
 
         function debounce(fn, ms) {
             let t;
@@ -793,6 +1000,7 @@
 
                 const savedSets = (session && session.sets && session.sets[ex.nome]) || [];
                 const totalSets = WARMUP_SETS + ex.series;
+                const suggestion = computeSuggestion(treinoKey, ex);
 
                 let warmupHtml = '';
                 for (let i = 0; i < WARMUP_SETS; i++) {
@@ -829,6 +1037,11 @@
                     <div class="exercise-info">
                         📊 ${ex.series} séries de ${ex.reps}
                     </div>
+                    ${suggestion ? `
+                    <div class="suggestion suggestion-${suggestion.action}">
+                        <span class="suggestion-text">💡 Sugestão: <strong>${formatKg(suggestion.weight)}</strong> — ${suggestion.message}</span>
+                        <button type="button" class="suggestion-apply">Usar</button>
+                    </div>` : ''}
                     <div class="sets-container">
                         ${warmupHtml}
                     </div>
@@ -870,6 +1083,22 @@
                         saveExerciseData();
                     }, 300));
                 });
+
+                if (suggestion) {
+                    card.querySelector('.suggestion-apply').addEventListener('click', () => {
+                        const value = suggestion.weight.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                        exerciseData[key] = exerciseData[key] || {};
+                        exerciseData[key].sets = exerciseData[key].sets || [];
+                        card.querySelectorAll('.set-weight-input').forEach((wIn) => {
+                            const w = Number(wIn.dataset.workingIndex);
+                            wIn.value = value;
+                            exerciseData[key].sets[w] = exerciseData[key].sets[w] || {};
+                            exerciseData[key].sets[w].weight = value;
+                        });
+                        saveExerciseData();
+                        showToast(`Carga de ${formatKg(suggestion.weight)} aplicada`);
+                    });
+                }
 
                 const noteInput = card.querySelector('.exercise-note-input');
                 noteInput.value = saved.note || '';
@@ -1013,9 +1242,260 @@
         function deleteHistoryEntry(id) {
             if (!confirm('Apagar este treino do histórico?')) return;
             workoutHistory = workoutHistory.filter((entry) => entry.id !== id);
+            deletedIds.push(id);
+            storageSet('treino.deletedIds', deletedIds);
             saveHistory();
-            renderHistory();
+            renderWorkout(currentWorkout);
         }
+
+        // ---------- Backup na nuvem (Firebase) ----------
+
+        // Cole aqui o objeto firebaseConfig do app web (Console do Firebase → Configurações do projeto → Seus apps).
+        // Enquanto for null, a seção de backup fica escondida e o app funciona só com os dados do celular.
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyB_tGeQxXB0SUGIlVCOHKDbAQpZfUSuRac",
+            authDomain: "treino-app-21fcd.firebaseapp.com",
+            projectId: "treino-app-21fcd",
+            storageBucket: "treino-app-21fcd.firebasestorage.app",
+            messagingSenderId: "1012262948925",
+            appId: "1:1012262948925:web:e0ae7e5cd4b4e270631a54"
+        };
+        const FIREBASE_SDK_VERSION = '10.14.1';
+        const DELETED_IDS_LIMIT = 200;
+
+        const cloud = { ready: false, loadFailed: false, user: null, db: null, syncing: false, pending: false, error: false, changeSeq: 0 };
+        const scheduleCloudSync = debounce(() => syncCloud(), 2000);
+
+        function saveCloudMeta() { storageSet('treino.cloudMeta', cloudMeta); }
+
+        function markCloudDirty() {
+            cloudMeta.dirty = true;
+            saveCloudMeta();
+            cloud.changeSeq++;
+            if (cloud.user) scheduleCloudSync();
+        }
+
+        // JSON com chaves ordenadas, para comparar dados sem depender da ordem
+        function stableStringify(value) {
+            if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+            if (value && typeof value === 'object') {
+                return '{' + Object.keys(value).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+            }
+            return JSON.stringify(value);
+        }
+
+        function localSnapshot() {
+            return {
+                history: workoutHistory,
+                deletedIds: deletedIds,
+                exerciseData: exerciseData,
+                exerciseDataUpdatedAt: cloudMeta.exerciseDataUpdatedAt || 0
+            };
+        }
+
+        // Junta os dados deste celular com os da nuvem: histórico pela união dos ids (menos os apagados),
+        // últimos valores digitados por exercício com prioridade para o lado editado mais recentemente
+        function mergeCloudData(local, remote) {
+            if (!remote) return local;
+            const deleted = Array.from(new Set([...(remote.deletedIds || []), ...(local.deletedIds || [])])).slice(-DELETED_IDS_LIMIT);
+            const deletedSet = new Set(deleted);
+
+            const byId = new Map();
+            [...(remote.history || []), ...(local.history || [])].forEach((entry) => {
+                if (entry && entry.id != null && !deletedSet.has(entry.id)) byId.set(entry.id, entry);
+            });
+            const history = Array.from(byId.values()).sort((a, b) => b.id - a.id).slice(0, HISTORY_LIMIT);
+
+            const localAt = local.exerciseDataUpdatedAt || 0;
+            const remoteAt = remote.exerciseDataUpdatedAt || 0;
+            const exerciseDataMerged = remoteAt > localAt
+                ? { ...(local.exerciseData || {}), ...(remote.exerciseData || {}) }
+                : { ...(remote.exerciseData || {}), ...(local.exerciseData || {}) };
+
+            return {
+                history: history,
+                deletedIds: deleted,
+                exerciseData: exerciseDataMerged,
+                exerciseDataUpdatedAt: Math.max(localAt, remoteAt)
+            };
+        }
+
+        function applyCloudData(data) {
+            const changed = stableStringify(data.history) !== stableStringify(workoutHistory)
+                || stableStringify(data.exerciseData) !== stableStringify(exerciseData);
+
+            workoutHistory = data.history;
+            deletedIds = data.deletedIds;
+            exerciseData = data.exerciseData;
+            cloudMeta.exerciseDataUpdatedAt = data.exerciseDataUpdatedAt;
+            storageSet('treino.history', workoutHistory);
+            storageSet('treino.deletedIds', deletedIds);
+            storageSet('treino.exerciseData', exerciseData);
+            saveCloudMeta();
+
+            if (changed) renderWorkout(currentWorkout);
+        }
+
+        async function syncCloud() {
+            if (!cloud.user) return;
+            if (cloud.syncing) { cloud.pending = true; return; }
+            if (!navigator.onLine) { renderCloudStatus(); return; }
+
+            cloud.syncing = true;
+            renderCloudStatus();
+            const seq = cloud.changeSeq;
+            const ref = cloud.db.collection('users').doc(cloud.user.uid);
+
+            try {
+                const local = localSnapshot();
+                const merged = await cloud.db.runTransaction(async (tx) => {
+                    const snap = await tx.get(ref);
+                    const remote = snap.exists ? JSON.parse(snap.data().payload) : null;
+                    const result = mergeCloudData(local, remote);
+                    tx.set(ref, {
+                        payload: JSON.stringify(result),
+                        schema: 1,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return result;
+                });
+                // Mescla de novo com o que mudou aqui enquanto a sincronização rodava
+                applyCloudData(mergeCloudData(localSnapshot(), merged));
+                if (cloud.changeSeq === seq) cloudMeta.dirty = false;
+                cloudMeta.lastSyncAt = Date.now();
+                saveCloudMeta();
+                cloud.error = false;
+            } catch (err) {
+                console.warn('Falha no backup:', err);
+                cloud.error = true;
+                setTimeout(() => { if (cloudMeta.dirty) syncCloud(); }, 60000);
+            } finally {
+                cloud.syncing = false;
+                renderCloudStatus();
+                if (cloud.pending) {
+                    cloud.pending = false;
+                    scheduleCloudSync();
+                }
+            }
+        }
+
+        function formatSyncTime(ts) {
+            const date = new Date(ts);
+            const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            if (date.toDateString() === new Date().toDateString()) return `hoje às ${time}`;
+            return `${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${time}`;
+        }
+
+        function renderCloudStatus() {
+            if (!FIREBASE_CONFIG) return;
+            const section = document.getElementById('cloud-section');
+            const icon = document.getElementById('cloud-icon');
+            const title = document.getElementById('cloud-title');
+            const detail = document.getElementById('cloud-detail');
+            const signIn = document.getElementById('cloud-signin');
+            const signOut = document.getElementById('cloud-signout');
+
+            section.hidden = false;
+            section.classList.toggle('cloud-on', !!cloud.user);
+            signIn.hidden = !cloud.ready || !!cloud.user;
+            signOut.hidden = !cloud.user;
+
+            if (!cloud.ready) {
+                icon.textContent = '☁️';
+                title.textContent = 'Backup na nuvem';
+                detail.textContent = cloud.loadFailed
+                    ? 'Sem conexão agora. Conecte-se à internet para ativar o backup.'
+                    : 'Carregando…';
+                return;
+            }
+
+            if (!cloud.user) {
+                icon.textContent = '☁️';
+                title.textContent = 'Backup desativado';
+                detail.textContent = 'Entre com sua conta Google para guardar seus treinos na nuvem. Assim nada se perde se trocar de celular.';
+                return;
+            }
+
+            icon.textContent = '✅';
+            title.textContent = 'Backup ativo';
+            let status;
+            if (cloud.syncing) status = 'Salvando…';
+            else if (!navigator.onLine && cloudMeta.dirty) status = 'Sem internet. O backup será feito quando a conexão voltar.';
+            else if (cloud.error) status = '⚠️ Não foi possível salvar agora. Vamos tentar de novo.';
+            else if (cloudMeta.lastSyncAt) status = `Último backup: ${formatSyncTime(cloudMeta.lastSyncAt)}`;
+            else status = 'Preparando o primeiro backup…';
+            detail.textContent = `${cloud.user.email || ''}\n${status}`;
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadFirebaseSdk() {
+            if (window.firebase && window.firebase.firestore) return;
+            const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/`;
+            await loadScript(base + 'firebase-app-compat.js');
+            await Promise.all([
+                loadScript(base + 'firebase-auth-compat.js'),
+                loadScript(base + 'firebase-firestore-compat.js')
+            ]);
+        }
+
+        async function initCloud() {
+            if (!FIREBASE_CONFIG || cloud.ready) return;
+            cloud.loadFailed = false;
+            renderCloudStatus();
+            try {
+                await loadFirebaseSdk();
+                if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+                cloud.db = firebase.firestore();
+            } catch (err) {
+                cloud.loadFailed = true;
+                renderCloudStatus();
+                window.addEventListener('online', initCloud, { once: true });
+                return;
+            }
+            cloud.ready = true;
+            firebase.auth().onAuthStateChanged((user) => {
+                cloud.user = user;
+                cloud.error = false;
+                renderCloudStatus();
+                if (user) syncCloud();
+            });
+        }
+
+        async function cloudSignIn() {
+            try {
+                await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                showToast('Backup ativado ☁️');
+            } catch (err) {
+                if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                    console.warn('Falha no login:', err);
+                    showToast('Não foi possível entrar');
+                }
+            }
+        }
+
+        async function cloudSignOut() {
+            if (!confirm('Sair da conta? Seus treinos continuam neste celular, mas o backup para de ser feito.')) return;
+            await firebase.auth().signOut();
+            showToast('Conta desconectada');
+        }
+
+        window.addEventListener('online', () => {
+            renderCloudStatus();
+            if (cloud.user && cloudMeta.dirty) syncCloud();
+        });
+        window.addEventListener('offline', renderCloudStatus);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && cloud.user) syncCloud();
+        });
 
         // ---------- Timer ----------
 
@@ -1145,6 +1625,10 @@
             const key = treinos[last.key] ? last.key : 'A';
             document.getElementById('workout-selector').value = key;
             renderWorkout(key);
+
+            // Pede ao navegador para não apagar os dados locais quando faltar espaço
+            if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+            initCloud();
         };
     </script>
 </body>

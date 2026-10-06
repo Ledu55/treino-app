@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'meu-treino-v6';
+const CACHE_VERSION = 'meu-treino-v7';
 const RUNTIME_CACHE = 'meu-treino-runtime-v1';
 
 const EXERCISE_GIFS = [
@@ -58,6 +58,8 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
     const isAppShell = url.origin === self.location.origin;
     const isExerciseImage = request.destination === 'image';
+    // Scripts do Firebase têm a versão na URL, então podem ficar em cache para o app abrir offline.
+    const isFirebaseSdk = url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/');
 
     if (isAppShell) {
         // Cache-first for the app shell, fall back to network.
@@ -67,8 +69,8 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    if (isExerciseImage) {
-        // Runtime cache-first for exercise GIFs so previously viewed workouts work offline.
+    if (isExerciseImage || isFirebaseSdk) {
+        // Runtime cache-first for exercise GIFs (and the versioned Firebase SDK) so the app works offline.
         event.respondWith(
             caches.match(request).then((cached) => {
                 if (cached) return cached;
