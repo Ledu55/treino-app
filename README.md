@@ -44,3 +44,7 @@ npx firebase login
 npm run deploy:rules:dev    # primeiro no projeto de dev
 npm run deploy:rules:prod
 ```
+
+### Mudanças no formato dos dados
+
+Toda mudança no formato dos dados sobe `SCHEMA_VERSION` em [src/migrations.js](src/migrations.js) e ganha uma migração na lista `MIGRATIONS`, com teste em [tests/unit/migrations.test.js](tests/unit/migrations.test.js). As migrações rodam ao abrir o app e ao receber o backup da nuvem; antes de migrar, o app guarda uma cópia dos dados antigos (`restoreBackup()` em [src/storage.js](src/storage.js) desfaz no celular).

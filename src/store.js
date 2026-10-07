@@ -1,6 +1,6 @@
 // Estado do app (dados locais + treino escolhido) e as ações que o alteram. JS puro: as telas
 // (src/ui) assinam as mudanças com subscribe(); a nuvem (cloud.js) é avisada por onDataChange.
-import { KEYS, loadLocalData, storageSet } from './storage.js';
+import { KEYS, prepareLocalData, storageSet } from './storage.js';
 import { treinos } from './data/treinos.js';
 import { getSetValues } from './progression.js';
 
@@ -11,8 +11,18 @@ let state = null;
 const listeners = new Set();
 let dataChangeHandler = () => {};
 
+// Devolve null se deu certo, ou o motivo de os dados locais não poderem ser usados ('newer':
+// gravados por uma versão mais nova do app; 'error': migração com erro). Nesses casos o app não
+// mostra o treino nem grava nada, para não estragar os dados.
 export function initStore() {
-    const data = loadLocalData();
+    let data;
+    try {
+        data = prepareLocalData();
+    } catch (err) {
+        console.error('Falha ao migrar os dados:', err);
+        return 'error';
+    }
+    if (!data) return 'newer';
     state = {
         exerciseData: data.exerciseData,
         sessions: data.sessions,
@@ -21,6 +31,7 @@ export function initStore() {
         cloudMeta: data.cloudMeta,
         currentWorkout: treinos[data.lastWorkout] ? data.lastWorkout : 'A'
     };
+    return null;
 }
 
 export function getState() {

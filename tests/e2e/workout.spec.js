@@ -185,3 +185,20 @@ test('cada treino tem sua sessão, e o app reabre no último treino escolhido', 
     await expect(exerciseCard(page, AGACHAMENTO).getByRole('button', { name: 'Série 1', exact: true }))
         .toHaveAttribute('aria-pressed', 'true');
 });
+
+test('dados de uma versão mais nova do app: não abre o treino nem altera nada', async ({ page }) => {
+    const data = {
+        'treino.schemaVersion': { version: 999 },
+        'treino.history': [{ id: 1, formatoNovo: true }],
+        'treino.exerciseData': { 'x': { y: 1 } }
+    };
+    await seedStorage(page, data);
+    await page.goto(APP);
+    await expect(page.getByText('Seus treinos foram salvos por uma versão mais nova do app')).toBeVisible();
+    await expect(page.locator('.exercise-card')).toHaveCount(0);
+
+    const stored = await page.evaluate(() => Object.fromEntries(
+        Object.keys(localStorage).map((k) => [k, JSON.parse(localStorage.getItem(k))])
+    ));
+    expect(stored).toEqual(data);
+});

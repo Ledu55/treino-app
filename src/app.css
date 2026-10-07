@@ -675,3 +675,10 @@ select {
     font-family: inherit;
     cursor: pointer;
 }
+
+.blocked p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--text-light);
+}

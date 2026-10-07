@@ -93,10 +93,12 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 **Por quê:** a fase 3 muda o formato dos dados de quem já usa o app.
 
-- [ ] Gravar `schemaVersion` nos dados locais e na nuvem (o documento da nuvem já tem `schema: 1`).
-- [ ] Criar uma lista ordenada de migrações (`v1 → v2 → ...`), aplicadas ao abrir o app e ao receber dados da nuvem.
-- [ ] Guardar uma cópia dos dados antigos antes de migrar, para poder desfazer.
-- [ ] Testar cada migração com dados reais anonimizados.
+- [x] Gravar a versão nos dados locais (`treino.schemaVersion`; sem ela, os dados são v1) e na nuvem (campo `schema` do documento, que já existia). O formato atual é a v1 (`SCHEMA_VERSION` em [src/migrations.js](src/migrations.js)).
+- [x] Lista ordenada de migrações (`MIGRATIONS`, hoje vazia), aplicadas ao abrir o app (`prepareLocalData`) e ao receber dados da nuvem (`migrateRemote`). Uma migração que falha não grava nada.
+- [x] Guardar uma cópia dos dados antigos antes de migrar: no celular em `treino.backupBeforeMigration` (`restoreBackup()` desfaz), na nuvem nos campos `previousPayload`/`previousSchema` do mesmo documento.
+- [x] Dados de versão mais nova: localmente, o app mostra "Atualize o app" e não lê nem grava nada; na nuvem, o backup não é lido nem sobrescrito e a seção de backup pede para atualizar, enquanto o treino continua sendo registrado no celular.
+- [x] Migração de exemplo testada (histórico antigo → uma linha por série, em [tests/unit/migrations.test.js](tests/unit/migrations.test.js)), com a sugestão de carga conferida antes e depois.
+- [ ] Testar cada migração com dados reais anonimizados. Por enquanto os testes usam [tests/unit/fixtures/dados-v1.json](tests/unit/fixtures/dados-v1.json), montado à mão com todos os formatos que existem hoje; falta trocar por uma exportação anonimizada do celular dela antes da primeira migração de verdade (item 6).
 
 **Pronto quando:** existe uma migração de exemplo testada e o app recusa com segurança dados de uma versão mais nova que ele não conhece.
 

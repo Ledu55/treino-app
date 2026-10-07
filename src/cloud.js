@@ -1,6 +1,7 @@
 // Backup na nuvem (Firebase): login Google e sincronização de um documento por pessoa em
 // users/{uid}. O celular é a fonte principal; sem login ou sem internet o app funciona igual.
 import { HISTORY_LIMIT, getState, localSnapshot, onDataChange, replaceData, saveCloudMeta } from './store.js';
+import { NewerSchemaError, SCHEMA_VERSION, migrate } from './migrations.js';
 import { debounce } from './util.js';
 
 // Um projeto Firebase por ambiente. O objeto firebaseConfig vem do Console do Firebase →
@@ -81,10 +82,21 @@ export function mergeCloudData(local, remote) {
     };
 }
 
+// Versão do formato do backup; documentos antigos sem o campo são da versão 1
+function remoteSchema(doc) {
+    return doc.schema || 1;
+}
+
+// Dados do documento da nuvem já no formato desta versão do app (NewerSchemaError se for mais nova)
+export function migrateRemote(doc, options) {
+    return migrate(JSON.parse(doc.payload), remoteSchema(doc), options);
+}
+
 // ---------- Sincronização ----------
 
 // Estado mostrado na seção de backup (ui/CloudSection.jsx)
-const cloud = { env: null, ready: false, loadFailed: false, user: null, syncing: false, error: false };
+// newerData: o backup na nuvem é de uma versão mais nova do app (não é lido nem gravado)
+const cloud = { env: null, ready: false, loadFailed: false, user: null, syncing: false, error: false, newerData: false };
 let sdk = null;
 let auth = null;
 let db = null;
@@ -128,13 +140,20 @@ async function syncCloud() {
         const local = localSnapshot();
         const merged = await sdk.runTransaction(db, async (tx) => {
             const snap = await tx.get(ref);
-            const remote = snap.exists() ? JSON.parse(snap.data().payload) : null;
+            const doc = snap.exists() ? snap.data() : null;
+            const remote = doc ? migrateRemote(doc) : null;
             const result = mergeCloudData(local, remote);
-            tx.set(ref, {
+            const update = {
                 payload: JSON.stringify(result),
-                schema: 1,
+                schema: SCHEMA_VERSION,
                 updatedAt: sdk.serverTimestamp()
-            });
+            };
+            // Cópia do backup antes de migrar, para poder desfazer (fica até a próxima migração)
+            if (doc && remoteSchema(doc) < SCHEMA_VERSION) {
+                update.previousPayload = doc.payload;
+                update.previousSchema = remoteSchema(doc);
+            }
+            tx.set(ref, update, { merge: true });
             return result;
         });
         // Mescla de novo com o que mudou aqui enquanto a sincronização rodava
@@ -143,10 +162,16 @@ async function syncCloud() {
         cloudMeta.lastSyncAt = Date.now();
         saveCloudMeta();
         cloud.error = false;
+        cloud.newerData = false;
     } catch (err) {
-        console.warn('Falha no backup:', err);
-        cloud.error = true;
-        setTimeout(() => { if (getState().cloudMeta.dirty) syncCloud(); }, 60000);
+        if (err instanceof NewerSchemaError) {
+            // Backup feito por uma versão mais nova do app: não mexe nele até este app atualizar
+            cloud.newerData = true;
+        } else {
+            console.warn('Falha no backup:', err);
+            cloud.error = true;
+            setTimeout(() => { if (getState().cloudMeta.dirty) syncCloud(); }, 60000);
+        }
     } finally {
         cloud.syncing = false;
         emit();
@@ -189,6 +214,7 @@ async function connect() {
     sdk.onAuthStateChanged(auth, (user) => {
         cloud.user = user;
         cloud.error = false;
+        cloud.newerData = false;
         emit();
         if (user) syncCloud();
     });

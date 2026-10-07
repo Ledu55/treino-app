@@ -30,6 +30,7 @@ function status(cloud, cloudMeta) {
     let text;
     if (cloud.syncing) text = 'Salvando…';
     else if (!navigator.onLine && cloudMeta.dirty) text = 'Sem internet. O backup será feito quando a conexão voltar.';
+    else if (cloud.newerData) text = '⚠️ Seu backup foi feito por uma versão mais nova do app. Atualize o app para continuar.';
     else if (cloud.error) text = '⚠️ Não foi possível salvar agora. Vamos tentar de novo.';
     else if (cloudMeta.lastSyncAt) text = `Último backup: ${formatSyncTime(cloudMeta.lastSyncAt)}`;
     else text = 'Preparando o primeiro backup…';

@@ -7,6 +7,8 @@ const AUTH = process.env.FIREBASE_AUTH_EMULATOR_HOST;
 const PROJECT = 'demo-treino';
 
 test.use({ blockFirebase: false });
+// Os testes apagam os dados do emulador antes de começar, então não podem rodar juntos
+test.describe.configure({ mode: 'serial' });
 test.skip(!FIRESTORE || !AUTH, 'precisa do Firebase Emulator (npm test)');
 
 // Servidores do Firebase de verdade (o emulador repete esses nomes só no caminho da URL)
@@ -77,4 +79,35 @@ test('login e backup em localhost usam o emulador, nunca a produção', async ({
     await other.close();
 
     expect(realRequests).toEqual([]);
+});
+
+test('backup de uma versão mais nova do app não é lido nem sobrescrito', async ({ page, request }) => {
+    // Cria a conta no emulador e fecha a página
+    await page.goto(`${APP}?emulator`);
+    await expect(page.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    const uid = await signIn(page);
+    await expect(page.locator('#cloud-detail')).toContainText('Último backup');
+    const browser = page.context().browser();
+    await page.close();
+
+    // Outro aparelho, com uma versão mais nova do app, gravou o backup num formato novo
+    const docUrl = `http://${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/users/${uid}`;
+    const newer = { fields: { payload: { stringValue: '{"formatoNovo":true}' }, schema: { integerValue: '999' } } };
+    expect((await request.patch(docUrl, { headers: { Authorization: 'Bearer owner' }, data: newer })).ok()).toBe(true);
+
+    const other = await browser.newPage();
+    other.on('dialog', (dialog) => dialog.accept());
+    await other.goto(`${APP}?emulator`);
+    await expect(other.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    await signIn(other);
+    await expect(other.locator('#cloud-detail')).toContainText('versão mais nova do app');
+
+    // Um treino finalizado fica no celular, e o backup continua intacto
+    await other.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect(other.locator('#toast')).toHaveText(/Treino salvo/);
+    await other.waitForTimeout(3000);
+    const doc = await (await request.get(docUrl, { headers: { Authorization: 'Bearer owner' } })).json();
+    expect(doc.fields.payload.stringValue).toBe('{"formatoNovo":true}');
+    expect(doc.fields.schema.integerValue).toBe('999');
+    await other.close();
 });

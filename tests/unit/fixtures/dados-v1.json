@@ -1,0 +1,35 @@
+{
+    "_sobre": "Dados no formato v1 com todos os formatos que existem nos celulares hoje (montados à mão; substituir por uma exportação anonimizada dos dados reais quando houver). Chaves = localStorage.",
+    "treino.exerciseData": {
+        "A|Agachamento": { "note": "banco no 4", "sets": [{ "weight": "40", "reps": "8" }, { "weight": "40", "reps": "7" }, { "weight": "37,5" }] },
+        "A|Stiff": { "weight": "30", "reps": "10, 10, 9", "note": "" },
+        "B|Elevação Lateral": { "sets": [{ "weight": "6kg", "reps": "12" }, { "weight": "6kg", "reps": "11" }, { "weight": "", "reps": "" }] },
+        "D|Puxador Frontal": { "weight": "35" }
+    },
+    "treino.session": {
+        "A": { "startedAt": "2026-10-06T21:10:00.000Z", "workoutNote": "dor leve no joelho", "sets": { "Agachamento": [true, true, true, false, false] } },
+        "C": { "startedAt": "2026-10-01T20:00:00.000Z", "workoutNote": "", "sets": {} }
+    },
+    "treino.history": [
+        {
+            "id": 1759700000000, "date": "2026-10-05T21:33:20.000Z", "workout": "A", "workoutNote": "treino bom",
+            "doneCount": 2, "totalCount": 6,
+            "exercises": [
+                { "nome": "Agachamento", "note": "banco no 4", "sets": [{ "weight": "40", "reps": "8", "done": true }, { "weight": "40", "reps": "8", "done": true }, { "weight": "40", "reps": "7", "done": true }], "setsDone": 3, "setsTotal": 3 },
+                { "nome": "Cadeira Flexora", "note": "", "sets": [{ "weight": "", "reps": "", "done": true }, { "weight": "", "reps": "", "done": true }], "setsDone": 2, "setsTotal": 2 },
+                { "nome": "Stiff", "note": "", "sets": [{ "weight": "30", "reps": "10", "done": false }, { "weight": "30", "reps": "10", "done": false }, { "weight": "30", "reps": "", "done": false }], "setsDone": 0, "setsTotal": 3 }
+            ]
+        },
+        {
+            "id": 1755400000000, "date": "2026-08-17T03:06:40.000Z", "workout": "A", "workoutNote": "",
+            "doneCount": 1, "totalCount": 6,
+            "exercises": [
+                { "nome": "Agachamento", "weight": "35", "reps": "8, 8, 6", "note": "", "setsDone": 3, "setsTotal": 3 },
+                { "nome": "Stiff", "weight": "", "reps": "", "note": "", "setsDone": 0, "setsTotal": 3 }
+            ]
+        }
+    ],
+    "treino.deletedIds": [1755300000000],
+    "treino.cloudMeta": { "dirty": false, "lastSyncAt": 1759700100000, "exerciseDataUpdatedAt": 1759700050000 },
+    "treino.lastWorkout": { "key": "A" }
+}
