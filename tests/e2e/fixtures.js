@@ -1,6 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 
-export const APP = 'meu_treino_app.html';
+export const APP = './';
 
 export const test = base.extend({
     // false no arquivo de teste da nuvem, que precisa carregar o Firebase
@@ -10,7 +10,9 @@ export const test = base.extend({
         // confirm() do app ("Finalizar mesmo assim?", "Apagar?") é sempre aceito
         page.on('dialog', (dialog) => dialog.accept());
         if (blockFirebase) {
-            await page.route('https://www.gstatic.com/firebasejs/**', (route) => route.abort());
+            // Sem o SDK (carregado sob demanda), o app fica como se estivesse sem internet
+            // e não fala com o projeto Firebase de dev que localhost usaria
+            await page.route('**/assets/firebase-sdk-*.js', (route) => route.abort());
         }
         await use(page);
     }

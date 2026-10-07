@@ -1,8 +1,5 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { loadApp } from './load-app.js';
-
-const app = loadApp();
-afterAll(() => app.close());
+import { describe, expect, it } from 'vitest';
+import * as app from '../../src/progression.js';
 
 describe('parseRepRange', () => {
     it('lê a faixa "X a Y repetições"', () => {

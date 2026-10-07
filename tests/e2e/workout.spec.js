@@ -44,6 +44,47 @@ test('carga, reps e observação digitadas ficam salvas', async ({ page }) => {
     await expect(reopened.locator('.exercise-note-input')).toHaveValue('banco no 4');
 });
 
+test('pausa no meio da digitação não come o espaço', async ({ page }) => {
+    await page.goto(APP);
+    const note = exerciseCard(page, AGACHAMENTO).locator('.exercise-note-input');
+    // O campo salva 300 ms depois da última tecla, sem os espaços das pontas
+    await note.pressSequentially('banco ');
+    await waitForSaved(page, 'A|Agachamento', { note: 'banco' });
+    await note.pressSequentially('no 4');
+    await expect(note).toHaveValue('banco no 4');
+    await waitForSaved(page, 'A|Agachamento', { note: 'banco no 4' });
+});
+
+test('o que foi digitado logo antes de trocar de treino fica salvo', async ({ page }) => {
+    await page.goto(APP);
+    await exerciseCard(page, AGACHAMENTO).locator('.set-weight-input').nth(0).fill('50');
+    await page.getByLabel('Escolher treino').selectOption('B');
+    await waitForSaved(page, 'A|Agachamento', { sets: [{ weight: '50' }] });
+});
+
+test('timer de descanso: abre, ganha +30s e fecha', async ({ page }) => {
+    await page.goto(APP);
+    const bar = page.locator('#timer-bar');
+    await expect(bar).not.toHaveClass(/visible/);
+
+    // Agachamento: 150 s de descanso
+    await exerciseCard(page, AGACHAMENTO).getByRole('button', { name: /Descanso \(2:30\)/ }).click();
+    await expect(bar).toHaveClass(/visible/);
+    await expect(page.locator('#timer-display')).toHaveText(/^2:(30|29)$/);
+
+    await page.getByRole('button', { name: '+30s' }).click();
+    await expect(page.locator('#timer-display')).toHaveText(/^(3:00|2:59)$/);
+
+    await page.getByRole('button', { name: 'Fechar / Parar' }).click();
+    await expect(bar).not.toHaveClass(/visible/);
+});
+
+test('o endereço antigo (meu_treino_app.html) leva ao app', async ({ page }) => {
+    await page.goto('meu_treino_app.html');
+    await expect(page).toHaveURL(/\/treino-app\/$/);
+    await expect(exerciseCard(page, AGACHAMENTO)).toBeVisible();
+});
+
 test('finalizar o treino guarda no histórico e mostra a sugestão de carga', async ({ page }) => {
     await page.goto(APP);
     const card = exerciseCard(page, AGACHAMENTO);

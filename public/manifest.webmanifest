@@ -2,7 +2,7 @@
   "name": "Meu Treino",
   "short_name": "Meu Treino",
   "description": "Acompanhamento de treino com séries e cronômetro de descanso",
-  "start_url": "./meu_treino_app.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3f4f6",

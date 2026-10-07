@@ -4,13 +4,13 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 ## Onde estamos
 
-- PWA de arquivo único ([meu_treino_app.html](meu_treino_app.html), ~1.500 linhas), publicado no GitHub Pages; [sw.js](sw.js) guarda o app em cache para uso offline.
-- Ficha de treinos (A/B/C/D) escrita direto no código, no objeto `treinos`.
+- PWA em Vite + Preact ([src/](src/)), publicado no GitHub Pages pelo GitHub Actions; [public/sw.js](public/sw.js) guarda o app em cache para uso offline.
+- Ficha de treinos (A/B/C/D) escrita direto no código, em [src/data/treinos.js](src/data/treinos.js).
 - Dados no `localStorage`: últimos valores digitados, treino em andamento e histórico (limitado a 50 treinos).
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): um documento por usuário em `users/{uid}`, sincronizado com `mergeCloudData`.
-- Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions; ainda sem ferramenta de build.
+- Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions.
 
 ## Princípios
 
@@ -61,18 +61,20 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 - [x] **Decisão:** interface em **Preact** (JSX + hooks, via `@preact/preset-vite`). Decidido antes da divisão para que as telas não sejam escritas duas vezes; o estado em árvore do editor do item 7 (fichas → treinos → exercícios → séries) é onde ele mais ajuda.
 - [x] Adotar o Vite: `npm start` para desenvolver, `npm run build` gera `dist/`, com `base: '/treino-app/'` para o GitHub Pages. Estáticos (GIFs, ícones, manifest, `sw.js`) em `public/`; por enquanto o `meu_treino_app.html` entra no build como está, e os testes de ponta a ponta já rodam contra o build.
 - [x] Publicar pelo GitHub Actions (build + `actions/deploy-pages`) em vez de servir a branch direto. Passo manual: em Settings → Pages, mudar a origem para "GitHub Actions".
-- [ ] Separar o CSS em `src/app.css`.
-- [ ] Separar o JS em módulos. Sugestão de divisão:
+- [x] Separar o CSS em `src/app.css`.
+- [x] Separar o JS em módulos:
   - `src/storage.js`: leitura/gravação local
-  - `src/progression.js`: sugestão de carga
-  - `src/cloud.js`: Firebase e sincronização (o SDK passa a vir do npm em vez do gstatic, ainda carregado sob demanda com `import()`)
+  - `src/store.js`: estado do app e as ações que o alteram (marcar série, finalizar treino...), com `subscribe()` para as telas
+  - `src/progression.js`: sugestão de carga (`computeSuggestion` agora recebe o histórico como parâmetro)
+  - `src/cloud.js`: Firebase e sincronização; o SDK (API modular) vem do npm e é carregado sob demanda com `import()`, num arquivo próprio (`firebase-sdk-*.js`)
   - `src/timer.js`: descanso e alarme
+  - `src/data/treinos.js`: a ficha A/B/C/D
   - `src/ui/*.jsx`: telas como componentes Preact
-- [ ] Reescrever a renderização em componentes Preact, o que também elimina os `onclick="..."` do HTML. As regras de cálculo (`storage`, `progression`, `cloud`, `timer`) ficam em JS puro, sem depender do Preact, para continuarem testáveis isoladamente.
-- [ ] Manter os mesmos textos, classes CSS e atributos usados pelos testes de ponta a ponta, para que eles provem que nada mudou.
-- [ ] Renomear `meu_treino_app.html` para `index.html`, mantendo um redirecionamento no nome antigo (em `public/`) para quem já tem o app instalado.
-- [ ] Testes: os de unidade importam os módulos direto, em vez de carregar o HTML no jsdom; os de ponta a ponta rodam contra o build (`vite preview`), que é o que vai para o celular.
-- [ ] Não melhorar a sincronização atual aqui: este item só move código. A sincronização é refeita no item 6.
+- [x] Reescrever a renderização em componentes Preact, sem `onclick="..."` no HTML. As regras de cálculo ficam em JS puro, sem depender do Preact.
+- [x] Manter os mesmos textos, classes CSS e atributos usados pelos testes de ponta a ponta. Conferido também comparando o DOM e capturas de tela do app antigo e do novo com os mesmos dados: só mudaram os `onclick` e espaços em branco.
+- [x] Renomear `meu_treino_app.html` para `index.html`, com um redirecionamento no nome antigo (`public/meu_treino_app.html`); o `start_url` do manifest passou para `./`.
+- [x] Testes: os de unidade importam os módulos direto (o carregamento do HTML no jsdom foi removido); os de ponta a ponta rodam contra o build. Novos testes: espaço digitado durante a pausa do salvamento, valor digitado logo antes de trocar de treino, timer e redirecionamento do endereço antigo. O teste da nuvem faz login pelo `window.__emulatorSignIn`, que só existe com o emulador.
+- [x] Não melhorar a sincronização atual aqui: este item só move código. A sincronização é refeita no item 6.
 
 **Pronto quando:** o app publicado se comporta exatamente igual e todos os testes do item 2 passam contra o build.
 

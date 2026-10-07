@@ -1,10 +1,5 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { loadApp, plain } from './load-app.js';
-
-const app = loadApp();
-afterAll(() => app.close());
-
-const merge = (local, remote) => plain(app.mergeCloudData(local, remote));
+import { describe, expect, it } from 'vitest';
+import { mergeCloudData as merge } from '../../src/cloud.js';
 
 function h(id, extra = {}) {
     return { id, workout: 'A', exercises: [], ...extra };

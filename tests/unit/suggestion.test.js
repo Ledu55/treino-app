@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { loadApp } from './load-app.js';
+import { describe, expect, it } from 'vitest';
+import { computeSuggestion } from '../../src/progression.js';
 
 // Exercício de referência: 3 séries de 10 a 12, incremento padrão (2,5 kg)
 const SUPINO = { nome: 'Supino', series: 3, reps: '10 a 12 repetições' };
@@ -28,14 +28,9 @@ function entry(workout, nome, workSets) {
 }
 
 // O histórico fica do mais novo para o mais antigo, como no app
-let app;
 function suggest(history, ex = SUPINO, workout = 'A') {
-    app = loadApp({ 'treino.history': history });
-    const result = app.computeSuggestion(workout, ex);
-    return result && { ...result };
+    return computeSuggestion(history, workout, ex);
 }
-
-afterEach(() => app && app.close());
 
 describe('computeSuggestion', () => {
     it('sem histórico, não sugere nada', () => {
@@ -147,9 +142,7 @@ describe('computeSuggestion', () => {
             entry('A', 'Supino', sets([40, 11], [40, 11], [40, 11]))
         ];
         expect(suggest(history, SUPINO, 'A').weight).toBe(40);
-        app.close();
         expect(suggest(history, SUPINO, 'C').weight).toBe(62.5);
-        app.close();
         expect(suggest(history, SUPINO, 'B')).toBeNull();
     });
 

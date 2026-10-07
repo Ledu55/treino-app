@@ -20,7 +20,7 @@ export default defineConfig({
     // Testa o build, que é o que vai para o celular
     webServer: {
         command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
-        url: `http://localhost:${PORT}/treino-app/meu_treino_app.html`,
+        url: `http://localhost:${PORT}/treino-app/`,
         reuseExistingServer: !process.env.CI
     }
 });

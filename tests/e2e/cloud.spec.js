@@ -21,6 +21,13 @@ async function readBackup(request, uid) {
     return JSON.parse((await res.json()).fields.payload.stringValue);
 }
 
+// O emulador aceita um token Google falso; equivale a escolher a conta no popup.
+// window.__emulatorSignIn só existe quando o app está ligado ao emulador (src/cloud.js).
+function signIn(page) {
+    const token = JSON.stringify({ sub: 'e2e-ana', email: 'ana@example.com', email_verified: true });
+    return page.evaluate((t) => window.__emulatorSignIn(t), token);
+}
+
 test.beforeEach(async ({ request }) => {
     await request.delete(`http://${FIRESTORE}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`);
     await request.delete(`http://${AUTH}/emulator/v1/projects/${PROJECT}/accounts`);
@@ -37,12 +44,7 @@ test('login e backup em localhost usam o emulador, nunca a produção', async ({
     await expect(page.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
     await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
 
-    // O emulador aceita um token Google falso; equivale a escolher a conta no popup
-    const uid = await page.evaluate(async () => {
-        const token = JSON.stringify({ sub: 'e2e-ana', email: 'ana@example.com', email_verified: true });
-        const result = await firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(token));
-        return result.user.uid;
-    });
+    const uid = await signIn(page);
 
     await expect(page.locator('#cloud-title')).toHaveText('Backup ativo [emulator]');
     await expect(page.locator('#cloud-detail')).toContainText('ana@example.com');
@@ -68,10 +70,7 @@ test('login e backup em localhost usam o emulador, nunca a produção', async ({
     watch(other);
     await other.goto(`${APP}?emulator`);
     await expect(other.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
-    await other.evaluate(async () => {
-        const token = JSON.stringify({ sub: 'e2e-ana', email: 'ana@example.com', email_verified: true });
-        await firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(token));
-    });
+    await signIn(other);
     await other.getByText('Histórico de treinos').click();
     await expect(other.locator('.history-entry')).toHaveCount(1);
     await expect(exerciseCard(other, 'Agachamento').locator('.suggestion')).toContainText('42,5 kg');

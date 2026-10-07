@@ -1,10 +1,7 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { loadApp } from './load-app.js';
+import { describe, expect, it } from 'vitest';
+import { pickFirebaseEnv } from '../../src/cloud.js';
 
-const app = loadApp();
-afterAll(() => app.close());
-
-const envFor = (url) => app.pickFirebaseEnv(new URL(url));
+const envFor = (url) => pickFirebaseEnv(new URL(url));
 
 describe('pickFirebaseEnv', () => {
     it('só o endereço publicado usa a produção', () => {

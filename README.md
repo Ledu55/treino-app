@@ -13,7 +13,7 @@ npx playwright install chromium   # uma vez
 
 | Comando | O que faz |
 |---|---|
-| `npm start` | Servidor de desenvolvimento (Vite) em http://localhost:8000/treino-app/meu_treino_app.html |
+| `npm start` | Servidor de desenvolvimento (Vite) em http://localhost:8000/treino-app/ |
 | `npm run build` | Gera a versão publicada em `dist/` |
 | `npm run preview` | Serve o `dist/` para conferir o build |
 | `npm run emulators` | Sobe o Firebase Emulator (login, Firestore e painel em http://localhost:4000) |
@@ -21,11 +21,11 @@ npx playwright install chromium   # uma vez
 | `npm run test:unit` | Só os testes de unidade (não precisam do emulador) |
 | `npm run test:e2e` | Só os testes de ponta a ponta (o de nuvem é pulado sem o emulador) |
 
-Arquivos estáticos (GIFs, ícones, manifest, `sw.js`) ficam em [public/](public/) e são copiados sem alteração para o build. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
+O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `cloud.js`, `timer.js`) e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest, `sw.js`, e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
 
 ### Qual Firebase o app usa
 
-Definido por `pickFirebaseEnv` no [meu_treino_app.html](meu_treino_app.html):
+Definido por `pickFirebaseEnv` em [src/cloud.js](src/cloud.js):
 
 | Endereço | Firebase |
 |---|---|

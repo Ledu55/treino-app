@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'meu-treino-v9';
+const CACHE_VERSION = 'meu-treino-v10';
 const RUNTIME_CACHE = 'meu-treino-runtime-v1';
 
 const EXERCISE_GIFS = [
@@ -26,6 +26,7 @@ const EXERCISE_GIFS = [
 ];
 
 const APP_SHELL = [
+    './',
     './meu_treino_app.html',
     './manifest.webmanifest',
     './icon-192.png',
@@ -62,9 +63,16 @@ self.addEventListener('fetch', (event) => {
     const isFirebaseSdk = url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/');
 
     if (isAppShell) {
-        // Cache-first for the app shell, fall back to network.
+        // Cache-first for the app shell, fall back to network. JS/CSS do build têm hash no nome
+        // e entram no cache na primeira vez que são baixados.
         event.respondWith(
-            caches.match(request).then((cached) => cached || fetch(request))
+            caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+                if (response.ok && url.pathname.includes('/assets/')) {
+                    const copy = response.clone();
+                    caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+                }
+                return response;
+            }))
         );
         return;
     }
