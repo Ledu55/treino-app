@@ -4,7 +4,7 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 ## Onde estamos
 
-- PWA em Vite + Preact ([src/](src/)), publicado no GitHub Pages pelo GitHub Actions; [public/sw.js](public/sw.js) guarda o app em cache para uso offline.
+- PWA em Vite + Preact ([src/](src/)), publicado no GitHub Pages pelo GitHub Actions; o service worker ([src/sw.js](src/sw.js), gerado pelo `vite-plugin-pwa`) guarda o app em cache para uso offline e avisa quando há versão nova.
 - Ficha de treinos (A/B/C/D) escrita direto no código, em [src/data/treinos.js](src/data/treinos.js).
 - Dados no `localStorage`: últimos valores digitados, treino em andamento e histórico (limitado a 50 treinos).
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
@@ -82,10 +82,10 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 **Por quê:** hoje é preciso lembrar de subir `CACHE_VERSION` em [sw.js](sw.js) a cada mudança; com vários arquivos, esquecer fica mais fácil e o celular fica com uma versão misturada.
 
-- [ ] Gerar o service worker com o `vite-plugin-pwa` (Workbox): versão e lista de arquivos saem do build, e o `sw.js` manual é removido.
-- [ ] Manter o nome `sw.js` e o mesmo escopo, para que o service worker já instalado no celular seja substituído pelo novo e não fique um antigo servindo cache velho.
-- [ ] Mostrar no app o aviso "Nova versão disponível — Atualizar" quando o service worker novo estiver pronto (`registerType: 'prompt'`).
-- [ ] Teste de ponta a ponta: servir dois builds seguidos e verificar que o aviso aparece e que a página atualiza.
+- [x] Gerar o service worker com o `vite-plugin-pwa` (Workbox, modo `injectManifest` a partir de [src/sw.js](src/sw.js)): versão e lista de arquivos saem do build, e o `sw.js` manual foi removido. Tudo vai para o cache na instalação, inclusive GIFs e o SDK do Firebase (~7,6 MB), e parâmetros na URL (ex.: `?emulator`) não impedem o uso do cache.
+- [x] Manter o nome `sw.js` e o mesmo escopo. Quem ainda tem o `sw.js` antigo (caches `meu-treino-*`) passa para o novo sem precisar tocar em "Atualizar", porque o app antigo não sabe mostrar o aviso; os caches antigos são apagados.
+- [x] Mostrar no app o aviso "Nova versão disponível — Atualizar" quando o service worker novo estiver pronto (`registerType: 'prompt'`). O app também procura versão nova ao voltar para o primeiro plano, e mostra a versão (data + commit) no rodapé.
+- [x] Teste de ponta a ponta ([tests/e2e/update.spec.js](tests/e2e/update.spec.js)): serve dois builds seguidos e verifica o aviso e a atualização; também testa abrir sem internet e a passagem a partir do `sw.js` antigo.
 
 **Pronto quando:** um push no `main` chega ao celular sem edição manual de versão, e o usuário vê o aviso de atualização.
 

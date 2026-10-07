@@ -5,6 +5,7 @@ import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
+import { UpdateBanner } from './UpdateBanner.jsx';
 import { useDebouncedField, useSubscription } from './hooks.js';
 
 function WorkoutNote({ workoutKey, value }) {
@@ -59,8 +60,10 @@ export function App() {
 
                 <HistorySection />
                 <CloudSection />
+                <p class="app-version">Versão {__APP_VERSION__}</p>
             </div>
 
+            <UpdateBanner />
             <TimerBar />
             <Toast />
         </>
