@@ -2,11 +2,48 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Backup de cada pessoa: users/{uid}. Só a própria pessoa lê e grava.
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function signedIn() {
+      return request.auth != null;
     }
 
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Personal autorizado pelo aluno: listado em trainers no documento do aluno, que só o
+    // próprio aluno grava. Remover da lista corta o acesso na hora.
+    function isTrainerOf(uid) {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(uid)).data.get('trainers', {}).get(request.auth.uid, false) == true;
+    }
+
+    // Perfil do aluno. O personal lê (inclusive pela consulta where('trainers.<uid>', '==', true),
+    // que lista os alunos dele), mas só o aluno grava o perfil e a lista de personais.
+    match /users/{uid} {
+      allow read: if isOwner(uid)
+        || (signedIn() && resource.data.get('trainers', {}).get(request.auth.uid, false) == true);
+      allow write: if isOwner(uid);
+
+      // Fichas: o personal cria e edita (identificando-se em updatedBy), mas não apaga
+      match /plans/{planId} {
+        allow read: if isOwner(uid) || isTrainerOf(uid);
+        allow write: if isOwner(uid);
+        allow create, update: if isTrainerOf(uid) && request.resource.data.updatedBy == request.auth.uid;
+      }
+
+      // Treinos finalizados: o personal só lê
+      match /sessions/{sessionId} {
+        allow read: if isOwner(uid) || isTrainerOf(uid);
+        allow write: if isOwner(uid);
+      }
+
+      // Últimos valores digitados: só o aluno
+      match /state/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // invites/{codigo} (convites de personal) entra com o modo personal (item 12).
     // Todo o resto é negado.
   }
 }

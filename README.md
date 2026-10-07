@@ -21,7 +21,7 @@ npx playwright install chromium   # uma vez
 | `npm run test:unit` | Só os testes de unidade (não precisam do emulador) |
 | `npm run test:e2e` | Só os testes de ponta a ponta (o de nuvem é pulado sem o emulador) |
 
-O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `cloud.js`, `timer.js`) e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
+O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `sync.js`, `cloud.js`, `timer.js`), biblioteca de exercícios e modelos de ficha em `src/data/` e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
 
 ### Qual Firebase o app usa
 
@@ -44,6 +44,8 @@ npx firebase login
 npm run deploy:rules:dev    # primeiro no projeto de dev
 npm run deploy:rules:prod
 ```
+
+As regras precisam estar publicadas antes do app que depende delas: desde o formato v2 o backup grava em `users/{uid}/plans`, `sessions` e `state`, que as regras antigas negam (o app só mostra "Não foi possível salvar agora" e tenta de novo, sem perder nada).
 
 ### Mudanças no formato dos dados
 

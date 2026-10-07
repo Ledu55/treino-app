@@ -1,7 +1,19 @@
-// Backup na nuvem (Firebase): login Google e sincronização de um documento por pessoa em
-// users/{uid}. O celular é a fonte principal; sem login ou sem internet o app funciona igual.
-import { HISTORY_LIMIT, getState, localSnapshot, onDataChange, replaceData, saveCloudMeta } from './store.js';
+// Backup na nuvem (Firebase): login Google e sincronização com o Firestore. O celular é a fonte
+// principal; sem login ou sem internet o app funciona igual. Formato na nuvem (v2):
+//
+//   users/{uid}                 perfil (nome, titulo, activePlanId, lastSessionAt, profileUpdatedAt),
+//                               schema e, depois da migração, previousPayload/previousSchema (backup v1)
+//   users/{uid}/plans/{id}      fichas (deleted: true quando apagada)
+//   users/{uid}/sessions/{id}   treinos finalizados (só { deleted: true } quando apagado)
+//   users/{uid}/state/current   últimos valores digitados: { values: { 'treino|exercício': ... } }
+//
+// Cada documento leva syncedAt (hora do servidor), e cada sincronização só busca o que mudou desde
+// a anterior. A mesclagem fica em sync.js.
+import {
+    getState, localSnapshot, markAllDirty, onDataChange, replaceData, saveCloudMeta
+} from './store.js';
 import { NewerSchemaError, SCHEMA_VERSION, migrate } from './migrations.js';
+import { mergeData, stableStringify } from './sync.js';
 import { debounce } from './util.js';
 
 // Um projeto Firebase por ambiente. O objeto firebaseConfig vem do Console do Firebase →
@@ -33,7 +45,8 @@ export const FIREBASE_CONFIGS = {
     }
 };
 const EMULATOR_HOSTS = { auth: 'http://localhost:9099', firestore: ['localhost', 8080] };
-const DELETED_IDS_LIMIT = 200;
+// Gravações por lote (o limite do Firestore é 500)
+const BATCH_SIZE = 400;
 
 // localhost usa o projeto de dev (ou o emulador, com ?emulator na URL ou sem projeto de dev);
 // só o endereço publicado usa a produção; qualquer outro endereço fica sem nuvem.
@@ -46,62 +59,44 @@ export function pickFirebaseEnv(loc) {
     return null;
 }
 
-// JSON com chaves ordenadas, para comparar dados sem depender da ordem
-export function stableStringify(value) {
-    if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
-    if (value && typeof value === 'object') {
-        return '{' + Object.keys(value).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
-    }
-    return JSON.stringify(value);
-}
-
-// Junta os dados deste celular com os da nuvem: histórico pela união dos ids (menos os apagados),
-// últimos valores digitados por exercício com prioridade para o lado editado mais recentemente
-export function mergeCloudData(local, remote) {
-    if (!remote) return local;
-    const deleted = Array.from(new Set([...(remote.deletedIds || []), ...(local.deletedIds || [])])).slice(-DELETED_IDS_LIMIT);
-    const deletedSet = new Set(deleted);
-
-    const byId = new Map();
-    [...(remote.history || []), ...(local.history || [])].forEach((entry) => {
-        if (entry && entry.id != null && !deletedSet.has(entry.id)) byId.set(entry.id, entry);
-    });
-    const history = Array.from(byId.values()).sort((a, b) => b.id - a.id).slice(0, HISTORY_LIMIT);
-
-    const localAt = local.exerciseDataUpdatedAt || 0;
-    const remoteAt = remote.exerciseDataUpdatedAt || 0;
-    const exerciseDataMerged = remoteAt > localAt
-        ? { ...(local.exerciseData || {}), ...(remote.exerciseData || {}) }
-        : { ...(remote.exerciseData || {}), ...(local.exerciseData || {}) };
-
-    return {
-        history: history,
-        deletedIds: deleted,
-        exerciseData: exerciseDataMerged,
-        exerciseDataUpdatedAt: Math.max(localAt, remoteAt)
-    };
-}
-
 // Versão do formato do backup; documentos antigos sem o campo são da versão 1
-function remoteSchema(doc) {
-    return doc.schema || 1;
+function remoteSchema(root) {
+    return root ? root.schema || 1 : SCHEMA_VERSION;
 }
 
-// Dados do documento da nuvem já no formato desta versão do app (NewerSchemaError se for mais nova)
-export function migrateRemote(doc, options) {
-    return migrate(JSON.parse(doc.payload), remoteSchema(doc), options);
+// Backup da v1 (um documento só, com tudo em payload) já no formato desta versão do app
+export function migrateRemote(root, options) {
+    return migrate(JSON.parse(root.payload), remoteSchema(root), options);
+}
+
+// Perfil gravado no documento do usuário (null se a pessoa ainda não terminou o primeiro acesso)
+export function rootToProfile(root) {
+    if (!root || root.profileUpdatedAt === undefined) return null;
+    const profile = {
+        nome: root.nome || '',
+        titulo: root.titulo || '',
+        activePlanId: root.activePlanId || null,
+        lastSessionAt: root.lastSessionAt || null,
+        updatedAt: root.profileUpdatedAt
+    };
+    if (root.trainers) profile.trainers = root.trainers;
+    return profile;
+}
+
+export function hasPendingChanges(meta) {
+    const dirty = (meta && meta.dirty) || {};
+    return !!dirty.profile || ['plans', 'history', 'values'].some((k) => dirty[k] && Object.keys(dirty[k]).length > 0);
 }
 
 // ---------- Sincronização ----------
 
-// Estado mostrado na seção de backup (ui/CloudSection.jsx)
+// Estado mostrado na seção de backup (ui/CloudSection.jsx) e no primeiro acesso
 // newerData: o backup na nuvem é de uma versão mais nova do app (não é lido nem gravado)
 const cloud = { env: null, ready: false, loadFailed: false, user: null, syncing: false, error: false, newerData: false };
 let sdk = null;
 let auth = null;
 let db = null;
 let pending = false;
-let changeSeq = 0;
 const listeners = new Set();
 const scheduleSync = debounce(() => syncCloud(), 2000);
 
@@ -118,10 +113,113 @@ function emit() {
     listeners.forEach((listener) => listener());
 }
 
+function isAfter(a, b) {
+    return !b || a.seconds > b.seconds || (a.seconds === b.seconds && a.nanoseconds > b.nanoseconds);
+}
+
+// Lê da nuvem o perfil, o que mudou desde `since` e os últimos valores
+async function pull(uid, since) {
+    const userRef = sdk.doc(db, 'users', uid);
+    const rootSnap = await sdk.getDoc(userRef);
+    const root = rootSnap.exists() ? rootSnap.data() : null;
+    if (remoteSchema(root) > SCHEMA_VERSION) throw new NewerSchemaError(remoteSchema(root));
+
+    const changedSince = (name) => {
+        const ref = sdk.collection(userRef, name);
+        return sdk.getDocs(since
+            ? sdk.query(ref, sdk.where('syncedAt', '>', new sdk.Timestamp(since.seconds, since.nanoseconds)))
+            : ref);
+    };
+    const [plansSnap, sessionsSnap, stateSnap] = await Promise.all([
+        changedSince('plans'),
+        changedSince('sessions'),
+        sdk.getDoc(sdk.doc(userRef, 'state', 'current'))
+    ]);
+
+    let pulledAt = since;
+    const read = (snap) => {
+        const { syncedAt, ...data } = snap.data();
+        if (syncedAt && isAfter(syncedAt, pulledAt)) pulledAt = { seconds: syncedAt.seconds, nanoseconds: syncedAt.nanoseconds };
+        return { ...data, id: snap.id };
+    };
+    const remote = { profile: rootToProfile(root), plans: {}, history: [], deletedIds: [], lastValues: {} };
+    plansSnap.forEach((snap) => { remote.plans[snap.id] = read(snap); });
+    sessionsSnap.forEach((snap) => {
+        const entry = read(snap);
+        if (entry.deleted) remote.deletedIds.push(entry.id);
+        else remote.history.push(entry);
+    });
+    if (stateSnap.exists()) remote.lastValues = stateSnap.data().values || {};
+
+    // Backup antigo (v1) ainda não migrado; também quando um celular com o app antigo o regravou
+    const legacy = root && root.payload && remoteSchema(root) < SCHEMA_VERSION ? migrateRemote(root) : null;
+    return { root, remote, legacy, pulledAt };
+}
+
+// Envia o que está em `dirty`, em lotes; o documento do usuário vai por último
+async function push(uid, dirty, root, legacy) {
+    const { profile, plans, history, deletedIds, lastValues } = getState();
+    const userRef = sdk.doc(db, 'users', uid);
+    const syncedAt = sdk.serverTimestamp();
+    const writes = [];
+
+    for (const id of Object.keys(dirty.plans || {})) {
+        if (plans[id]) writes.push([sdk.doc(userRef, 'plans', id), { ...plans[id], syncedAt }]);
+    }
+    const deleted = new Set(deletedIds);
+    const byId = new Map(history.map((entry) => [entry.id, entry]));
+    for (const id of Object.keys(dirty.history || {})) {
+        const ref = sdk.doc(userRef, 'sessions', id);
+        if (deleted.has(id)) writes.push([ref, { deleted: true, updatedAt: Date.now(), syncedAt }]);
+        else if (byId.has(id)) writes.push([ref, { ...byId.get(id), syncedAt }]);
+    }
+    const valueKeys = Object.keys(dirty.values || {}).filter((k) => lastValues[k]);
+    if (valueKeys.length) {
+        // merge: só os exercícios alterados, sem apagar os que outro celular gravou
+        const values = Object.fromEntries(valueKeys.map((k) => [k, lastValues[k]]));
+        writes.push([sdk.doc(userRef, 'state', 'current'), { values, syncedAt }, { merge: true }]);
+    }
+
+    const rootUpdate = {};
+    if (dirty.profile && profile) {
+        Object.assign(rootUpdate, {
+            nome: profile.nome,
+            titulo: profile.titulo,
+            activePlanId: profile.activePlanId,
+            lastSessionAt: profile.lastSessionAt,
+            profileUpdatedAt: profile.updatedAt
+        });
+    }
+    if (legacy) {
+        // Cópia do backup v1, para poder desfazer (fica até a próxima migração)
+        Object.assign(rootUpdate, { previousPayload: root.payload, previousSchema: remoteSchema(root), payload: sdk.deleteField() });
+    }
+    if (Object.keys(rootUpdate).length || remoteSchema(root) !== SCHEMA_VERSION || !root) {
+        writes.push([userRef, { ...rootUpdate, schema: SCHEMA_VERSION, updatedAt: syncedAt }, { merge: true }]);
+    }
+
+    for (let i = 0; i < writes.length; i += BATCH_SIZE) {
+        const batch = sdk.writeBatch(db);
+        writes.slice(i, i + BATCH_SIZE).forEach(([ref, data, options]) => batch.set(ref, data, options || {}));
+        await batch.commit();
+    }
+}
+
+// Tira de dirty o que foi enviado e não mudou de novo enquanto isso
+function clearDirty(meta, sent) {
+    if (!meta.dirty) return;
+    if (sent.profile && meta.dirty.profile === sent.profile) delete meta.dirty.profile;
+    for (const kind of ['plans', 'history', 'values']) {
+        for (const [id, seq] of Object.entries(sent[kind] || {})) {
+            if (meta.dirty[kind] && meta.dirty[kind][id] === seq) delete meta.dirty[kind][id];
+        }
+    }
+}
+
 function applyCloudData(data) {
-    const { history, exerciseData } = getState();
-    const changed = stableStringify(data.history) !== stableStringify(history)
-        || stableStringify(data.exerciseData) !== stableStringify(exerciseData);
+    const before = localSnapshot();
+    const changed = ['profile', 'plans', 'history', 'lastValues']
+        .some((k) => stableStringify(before[k]) !== stableStringify(data[k]));
     replaceData(data, changed);
 }
 
@@ -130,36 +228,29 @@ async function syncCloud() {
     if (cloud.syncing) { pending = true; return; }
     if (!navigator.onLine) { emit(); return; }
 
-    const { cloudMeta } = getState();
+    const uid = cloud.user.uid;
+    const meta = getState().cloudMeta;
     cloud.syncing = true;
     emit();
-    const seq = changeSeq;
-    const ref = sdk.doc(db, 'users', cloud.user.uid);
 
     try {
-        const local = localSnapshot();
-        const merged = await sdk.runTransaction(db, async (tx) => {
-            const snap = await tx.get(ref);
-            const doc = snap.exists() ? snap.data() : null;
-            const remote = doc ? migrateRemote(doc) : null;
-            const result = mergeCloudData(local, remote);
-            const update = {
-                payload: JSON.stringify(result),
-                schema: SCHEMA_VERSION,
-                updatedAt: sdk.serverTimestamp()
-            };
-            // Cópia do backup antes de migrar, para poder desfazer (fica até a próxima migração)
-            if (doc && remoteSchema(doc) < SCHEMA_VERSION) {
-                update.previousPayload = doc.payload;
-                update.previousSchema = remoteSchema(doc);
-            }
-            tx.set(ref, update, { merge: true });
-            return result;
-        });
-        // Mescla de novo com o que mudou aqui enquanto a sincronização rodava
-        applyCloudData(mergeCloudData(localSnapshot(), merged));
-        if (changeSeq === seq) cloudMeta.dirty = false;
-        cloudMeta.lastSyncAt = Date.now();
+        // Outra conta (ou a primeira sincronização depois da migração): busca tudo e envia tudo
+        if (meta.uid !== uid) {
+            meta.uid = uid;
+            meta.pulledAt = null;
+            markAllDirty();
+        }
+        const { root, remote, legacy, pulledAt } = await pull(uid, meta.pulledAt);
+        let merged = mergeData(localSnapshot(), remote);
+        if (legacy) merged = mergeData(merged, legacy);
+        applyCloudData(merged);
+        if (legacy) markAllDirty();
+
+        const sent = structuredClone(meta.dirty || {});
+        await push(uid, sent, root, legacy);
+        clearDirty(meta, sent);
+        meta.pulledAt = pulledAt;
+        meta.lastSyncAt = Date.now();
         saveCloudMeta();
         cloud.error = false;
         cloud.newerData = false;
@@ -170,7 +261,7 @@ async function syncCloud() {
         } else {
             console.warn('Falha no backup:', err);
             cloud.error = true;
-            setTimeout(() => { if (getState().cloudMeta.dirty) syncCloud(); }, 60000);
+            setTimeout(() => { if (hasPendingChanges(getState().cloudMeta)) syncCloud(); }, 60000);
         }
     } finally {
         cloud.syncing = false;
@@ -187,7 +278,7 @@ async function loadSdk(config) {
     const mod = await import('./firebase-sdk.js');
     const app = mod.initializeApp(config);
     auth = mod.getAuth(app);
-    db = mod.getFirestore(app);
+    db = mod.initializeFirestore(app, { ignoreUndefinedProperties: true });
     if (cloud.env === 'emulator') {
         mod.connectAuthEmulator(auth, EMULATOR_HOSTS.auth, { disableWarnings: true });
         mod.connectFirestoreEmulator(db, ...EMULATOR_HOSTS.firestore);
@@ -225,12 +316,11 @@ export function initCloud() {
     if (!FIREBASE_CONFIGS[cloud.env]) return;
 
     onDataChange(() => {
-        changeSeq++;
         if (cloud.user) scheduleSync();
     });
     window.addEventListener('online', () => {
         emit();
-        if (cloud.user && getState().cloudMeta.dirty) syncCloud();
+        if (cloud.user && hasPendingChanges(getState().cloudMeta)) syncCloud();
     });
     window.addEventListener('offline', emit);
     document.addEventListener('visibilitychange', () => {

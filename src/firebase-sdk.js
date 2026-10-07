@@ -5,4 +5,7 @@ export {
     getAuth, connectAuthEmulator, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut,
     GoogleAuthProvider
 } from 'firebase/auth';
-export { getFirestore, connectFirestoreEmulator, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+export {
+    initializeFirestore, connectFirestoreEmulator, doc, collection, query, where, getDoc, getDocs, writeBatch,
+    serverTimestamp, deleteField, Timestamp
+} from 'firebase/firestore';

@@ -5,8 +5,18 @@ export const APP = './';
 export const test = base.extend({
     // false no arquivo de teste da nuvem, que precisa carregar o Firebase
     blockFirebase: [true, { option: true }],
+    // true: abre como quem já usava o app (dados da v1, que viram a ficha A/B/C/D com os treinos
+    // A, B, C e D); false: celular sem nenhum dado
+    existingUser: [true, { option: true }],
 
-    page: async ({ page, blockFirebase }, use) => {
+    page: async ({ page, blockFirebase, existingUser }, use) => {
+        if (existingUser) {
+            await page.addInitScript(() => {
+                if (sessionStorage.getItem('existing-user')) return;
+                sessionStorage.setItem('existing-user', '1');
+                if (!localStorage.getItem('treino.schemaVersion')) localStorage.setItem('treino.lastWorkout', '{"key":"A"}');
+            });
+        }
         // confirm() do app ("Finalizar mesmo assim?", "Apagar?") é sempre aceito
         page.on('dialog', (dialog) => dialog.accept());
         if (blockFirebase) {
@@ -44,11 +54,11 @@ export async function doSets(card, rows) {
     }
 }
 
-// Os campos salvam com 300 ms de atraso; espera os valores do exercício (ex.: 'A|Agachamento')
-// chegarem ao localStorage. `expected` é comparado com toMatchObject.
+// Os campos salvam com 300 ms de atraso; espera os valores do exercício ('idDoTreino|idDoExercício',
+// ex.: 'A|agachamento') chegarem ao localStorage. `expected` é comparado com toMatchObject.
 export async function waitForSaved(page, key, expected) {
     await expect.poll(() => page.evaluate((k) => {
-        const data = JSON.parse(localStorage.getItem('treino.exerciseData') || '{}');
+        const data = JSON.parse(localStorage.getItem('treino.lastValues') || '{}');
         return data[k] || {};
     }, key)).toMatchObject(expected);
 }

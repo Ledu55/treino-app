@@ -1,11 +1,13 @@
 // Estado do app (dados locais + treino escolhido) e as ações que o alteram. JS puro: as telas
 // (src/ui) assinam as mudanças com subscribe(); a nuvem (cloud.js) é avisada por onDataChange.
 import { KEYS, prepareLocalData, storageSet } from './storage.js';
-import { treinos } from './data/treinos.js';
+import { resolveExercise } from './data/library.js';
+import { getTemplate } from './data/templates.js';
 import { getSetValues } from './progression.js';
+import { sortHistory } from './sync.js';
+import { newId } from './util.js';
 
 export const WARMUP_SETS = 2;
-export const HISTORY_LIMIT = 50;
 
 let state = null;
 const listeners = new Set();
@@ -23,14 +25,8 @@ export function initStore() {
         return 'error';
     }
     if (!data) return 'newer';
-    state = {
-        exerciseData: data.exerciseData,
-        sessions: data.sessions,
-        history: data.history,
-        deletedIds: data.deletedIds,
-        cloudMeta: data.cloudMeta,
-        currentWorkout: treinos[data.lastWorkout] ? data.lastWorkout : 'A'
-    };
+    state = { ...data, currentWorkoutId: data.lastWorkout };
+    delete state.lastWorkout;
     return null;
 }
 
@@ -47,156 +43,205 @@ function emit() {
     listeners.forEach((listener) => listener());
 }
 
-// Chamado a cada mudança no histórico ou nos últimos valores (o que vai para o backup)
+// Chamado a cada mudança no que vai para o backup
 export function onDataChange(handler) {
     dataChangeHandler = handler;
 }
 
-export function exerciseKey(workoutKey, nome) {
-    return workoutKey + '|' + nome;
+export function valuesKey(workoutId, exerciseId) {
+    return workoutId + '|' + exerciseId;
 }
 
 // ---------- Gravação ----------
 
-function saveSessions() { storageSet(KEYS.session, state.sessions); }
+function saveSessions() { storageSet(KEYS.sessions, state.sessions); }
+function saveProfile() { storageSet(KEYS.profile, state.profile); }
+function savePlans() { storageSet(KEYS.plans, state.plans); }
+function saveLastValues() { storageSet(KEYS.lastValues, state.lastValues); }
+function saveHistory() {
+    storageSet(KEYS.history, state.history);
+    storageSet(KEYS.deletedIds, state.deletedIds);
+}
 export function saveCloudMeta() { storageSet(KEYS.cloudMeta, state.cloudMeta); }
 
-function markDataChanged() {
-    state.cloudMeta.dirty = true;
+// O que mudou e ainda não foi para a nuvem: dirty = { profile, plans: {id}, history: {id},
+// values: {chave} }, cada um com um número que cresce a cada mudança (cloud.js só limpa o que
+// não mudou de novo enquanto enviava)
+function markDirty(kind, id) {
+    const meta = state.cloudMeta;
+    meta.seq = (meta.seq || 0) + 1;
+    meta.dirty = meta.dirty || {};
+    if (kind === 'profile') meta.dirty.profile = meta.seq;
+    else (meta.dirty[kind] = meta.dirty[kind] || {})[id] = meta.seq;
     saveCloudMeta();
     dataChangeHandler();
 }
 
-function saveExerciseData() {
-    storageSet(KEYS.exerciseData, state.exerciseData);
-    state.cloudMeta.exerciseDataUpdatedAt = Date.now();
-    markDataChanged();
+// Tudo o que existe no celular vai para a nuvem na próxima sincronização (outra conta, ou dados
+// recém-migrados)
+export function markAllDirty() {
+    const meta = state.cloudMeta;
+    meta.seq = (meta.seq || 0) + 1;
+    const all = (keys) => Object.fromEntries(keys.map((k) => [k, meta.seq]));
+    meta.dirty = {
+        profile: state.profile ? meta.seq : undefined,
+        plans: all(Object.keys(state.plans)),
+        history: all([...state.history.map((e) => e.id), ...state.deletedIds]),
+        values: all(Object.keys(state.lastValues))
+    };
+    saveCloudMeta();
 }
 
-function saveHistory() {
-    storageSet(KEYS.history, state.history);
-    markDataChanged();
+// ---------- Ficha e treino escolhidos ----------
+
+export function getPlan(planId) {
+    const plan = state.plans[planId];
+    return plan && !plan.deleted ? plan : null;
+}
+
+export function listPlans() {
+    return Object.values(state.plans).filter((p) => !p.deleted)
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+export function getActivePlan() {
+    return state.profile ? getPlan(state.profile.activePlanId) : null;
+}
+
+export function getCurrentWorkout() {
+    const plan = getActivePlan();
+    if (!plan || plan.treinos.length === 0) return null;
+    return plan.treinos.find((t) => t.id === state.currentWorkoutId) || plan.treinos[0];
+}
+
+// Exercícios de um treino da ficha, com nome, GIF e instruções da biblioteca
+export function workoutExercises(workout) {
+    return workout.exercicios.map(resolveExercise);
+}
+
+export function selectWorkout(workoutId) {
+    state.currentWorkoutId = workoutId;
+    storageSet(KEYS.lastWorkout, { key: workoutId });
+    emit();
 }
 
 // ---------- Treino em andamento ----------
 
-function getSession(workoutKey) {
-    if (!state.sessions[workoutKey]) {
-        state.sessions[workoutKey] = { startedAt: new Date().toISOString(), sets: {}, workoutNote: '' };
+function getSession(workoutId) {
+    if (!state.sessions[workoutId]) {
+        state.sessions[workoutId] = { startedAt: new Date().toISOString(), sets: {}, workoutNote: '' };
     }
-    return state.sessions[workoutKey];
+    return state.sessions[workoutId];
 }
 
-export function isExerciseDone(workoutKey, ex) {
-    const session = state.sessions[workoutKey];
-    const sets = session && session.sets && session.sets[ex.nome];
-    if (!Array.isArray(sets)) return false;
+export function isSetDone(workoutId, exerciseId, setIndex) {
+    const session = state.sessions[workoutId];
+    const sets = session && session.sets && session.sets[exerciseId];
+    return !!(sets && sets[setIndex]);
+}
+
+export function isExerciseDone(workoutId, ex) {
     for (let i = WARMUP_SETS; i < WARMUP_SETS + ex.series; i++) {
-        if (!sets[i]) return false;
+        if (!isSetDone(workoutId, ex.exerciseId, i)) return false;
     }
     return true;
 }
 
-export function countDone(workoutKey) {
-    return treinos[workoutKey].filter((ex) => isExerciseDone(workoutKey, ex)).length;
-}
-
-export function selectWorkout(workoutKey) {
-    state.currentWorkout = workoutKey;
-    storageSet(KEYS.lastWorkout, { key: workoutKey });
-    emit();
+export function countDone(workout) {
+    return workoutExercises(workout).filter((ex) => isExerciseDone(workout.id, ex)).length;
 }
 
 // setIndex conta os aquecimentos: 0 e 1 são aquecimento, 2 em diante são as séries de trabalho
-export function toggleSet(workoutKey, ex, setIndex) {
-    const session = getSession(workoutKey);
-    if (!Array.isArray(session.sets[ex.nome])) {
-        session.sets[ex.nome] = new Array(WARMUP_SETS + ex.series).fill(false);
-    }
-    session.sets[ex.nome][setIndex] = !session.sets[ex.nome][setIndex];
+export function toggleSet(workoutId, ex, setIndex) {
+    const session = getSession(workoutId);
+    const sets = Array.isArray(session.sets[ex.exerciseId]) ? session.sets[ex.exerciseId] : [];
+    while (sets.length < WARMUP_SETS + ex.series) sets.push(false);
+    sets[setIndex] = !sets[setIndex];
+    session.sets[ex.exerciseId] = sets;
     saveSessions();
     emit();
 }
 
-export function setWorkoutNote(workoutKey, text) {
-    getSession(workoutKey).workoutNote = text;
+export function setWorkoutNote(workoutId, text) {
+    getSession(workoutId).workoutNote = text;
     saveSessions();
     emit();
 }
 
 // ---------- Últimos valores digitados ----------
 
-function exerciseEntry(key) {
-    state.exerciseData[key] = state.exerciseData[key] || {};
-    return state.exerciseData[key];
+function changeValues(key, change) {
+    const saved = { sets: [], note: '', ...state.lastValues[key] };
+    saved.sets = (saved.sets || []).slice();
+    change(saved);
+    saved.updatedAt = Date.now();
+    state.lastValues[key] = saved;
+    saveLastValues();
+    markDirty('values', key);
+    emit();
 }
 
 // field: 'weight' ou 'reps' da série de trabalho w
 export function setSetValue(key, w, field, value) {
-    const saved = exerciseEntry(key);
-    saved.sets = saved.sets || [];
-    saved.sets[w] = saved.sets[w] || {};
-    saved.sets[w][field] = value;
-    saveExerciseData();
-    emit();
+    changeValues(key, (saved) => {
+        for (let i = 0; i <= w; i++) saved.sets[i] = { weight: '', reps: '', ...saved.sets[i] };
+        saved.sets[w][field] = value;
+    });
 }
 
 export function setExerciseNote(key, value) {
-    exerciseEntry(key).note = value;
-    saveExerciseData();
-    emit();
+    changeValues(key, (saved) => { saved.note = value; });
 }
 
 // Mesma carga em todas as séries de trabalho (botão "Usar" da sugestão)
 export function applyWeight(key, series, value) {
-    const saved = exerciseEntry(key);
-    saved.sets = saved.sets || [];
-    for (let w = 0; w < series; w++) {
-        saved.sets[w] = saved.sets[w] || {};
-        saved.sets[w].weight = value;
-    }
-    saveExerciseData();
-    emit();
+    changeValues(key, (saved) => {
+        for (let w = 0; w < series; w++) saved.sets[w] = { weight: '', reps: '', ...saved.sets[w], weight: value };
+    });
 }
 
 // ---------- Histórico ----------
 
-export function finishWorkout(workoutKey) {
-    const exercises = treinos[workoutKey];
-    const session = state.sessions[workoutKey];
+export function finishWorkout(workout) {
+    const exercises = workoutExercises(workout);
+    const session = state.sessions[workout.id];
+    const date = new Date().toISOString();
     const entry = {
-        id: Date.now(),
-        date: new Date().toISOString(),
-        workout: workoutKey,
+        id: newId(),
+        date,
+        planId: state.profile.activePlanId,
+        workoutId: workout.id,
+        workoutNome: workout.nome,
         workoutNote: (session && session.workoutNote) || '',
-        doneCount: countDone(workoutKey),
+        doneCount: countDone(workout),
         totalCount: exercises.length,
+        updatedAt: Date.now(),
         exercises: exercises.map((ex) => {
-            const saved = state.exerciseData[exerciseKey(workoutKey, ex.nome)] || {};
-            const sessSets = (session && session.sets && session.sets[ex.nome]) || [];
+            const saved = state.lastValues[valuesKey(workout.id, ex.exerciseId)] || {};
             const sets = [];
-            let setsDone = 0;
             for (let w = 0; w < ex.series; w++) {
-                const done = !!sessSets[WARMUP_SETS + w];
-                if (done) setsDone++;
-                const vals = getSetValues(saved, w);
-                sets.push({ weight: vals.weight, reps: vals.reps, done: done });
+                sets.push({ ...getSetValues(saved, w), done: isSetDone(workout.id, ex.exerciseId, WARMUP_SETS + w) });
             }
             return {
+                exerciseId: ex.exerciseId,
                 nome: ex.nome,
                 note: saved.note || '',
-                sets: sets,
-                setsDone: setsDone,
+                sets,
+                setsDone: sets.filter((s) => s.done).length,
                 setsTotal: ex.series
             };
         })
     };
 
     state.history.unshift(entry);
-    if (state.history.length > HISTORY_LIMIT) state.history = state.history.slice(0, HISTORY_LIMIT);
     saveHistory();
+    markDirty('history', entry.id);
+    // Para a lista de alunos do personal (lastSessionAt não conta como edição do perfil)
+    state.profile = { ...state.profile, lastSessionAt: date };
+    saveProfile();
+    markDirty('profile');
 
-    delete state.sessions[workoutKey];
+    delete state.sessions[workout.id];
     saveSessions();
     emit();
 }
@@ -204,9 +249,107 @@ export function finishWorkout(workoutKey) {
 export function deleteHistoryEntry(id) {
     state.history = state.history.filter((entry) => entry.id !== id);
     state.deletedIds.push(id);
-    storageSet(KEYS.deletedIds, state.deletedIds);
     saveHistory();
+    markDirty('history', id);
     emit();
+}
+
+// ---------- Perfil ----------
+
+export function updateProfile(changes) {
+    state.profile = { ...state.profile, ...changes, updatedAt: Date.now() };
+    saveProfile();
+    markDirty('profile');
+    emit();
+}
+
+// Título do app: o escolhido pela pessoa ou "Treino de <nome>"
+export function appTitle(profile = state && state.profile) {
+    if (profile && profile.titulo) return profile.titulo;
+    if (profile && profile.nome) return `Treino de ${profile.nome}`;
+    return 'Meu Treino';
+}
+
+// ---------- Fichas ----------
+
+function copyWorkouts(treinos) {
+    return treinos.map((t) => ({ ...structuredClone(t), id: newId() }));
+}
+
+function savePlan(plan) {
+    state.plans[plan.id] = plan;
+    savePlans();
+    markDirty('plans', plan.id);
+}
+
+// Ficha nova, a partir de um modelo ou em branco (com um treino vazio)
+export function createPlan({ templateId, nome } = {}) {
+    const template = templateId && getTemplate(templateId);
+    const plan = {
+        id: newId(),
+        nome: nome || (template ? template.nome : 'Minha ficha'),
+        treinos: template ? copyWorkouts(template.treinos) : [{ id: newId(), nome: 'Treino A', exercicios: [] }],
+        createdBy: null,
+        updatedBy: null,
+        updatedAt: Date.now()
+    };
+    savePlan(plan);
+    emit();
+    return plan.id;
+}
+
+// Altera uma cópia da ficha: change(draft) pode mudar nome, treinos e exercícios
+export function updatePlan(planId, change) {
+    const draft = structuredClone(state.plans[planId]);
+    change(draft);
+    draft.updatedAt = Date.now();
+    savePlan(draft);
+    emit();
+}
+
+export function duplicatePlan(planId) {
+    const source = state.plans[planId];
+    const plan = {
+        ...structuredClone(source),
+        id: newId(),
+        nome: `${source.nome} (cópia)`,
+        treinos: copyWorkouts(source.treinos),
+        createdBy: null,
+        updatedBy: null,
+        updatedAt: Date.now()
+    };
+    savePlan(plan);
+    emit();
+    return plan.id;
+}
+
+// A ficha fica marcada como apagada, para a nuvem e os outros celulares saberem
+export function deletePlan(planId) {
+    savePlan({ ...state.plans[planId], deleted: true, updatedAt: Date.now() });
+    if (state.profile.activePlanId === planId) {
+        const next = listPlans()[0];
+        updateProfile({ activePlanId: next ? next.id : null });
+    } else {
+        emit();
+    }
+}
+
+export function setActivePlan(planId) {
+    updateProfile({ activePlanId: planId });
+    const workout = getCurrentWorkout();
+    if (workout) selectWorkout(workout.id);
+}
+
+// ---------- Primeiro acesso ----------
+
+// templateId null: ficha em branco. Devolve o id da ficha criada.
+export function completeOnboarding({ nome, templateId }) {
+    const planId = createPlan({ templateId, nome: templateId ? undefined : 'Minha ficha' });
+    state.profile = { nome: nome.trim(), titulo: '', activePlanId: planId, lastSessionAt: null, updatedAt: Date.now() };
+    saveProfile();
+    markDirty('profile');
+    emit();
+    return planId;
 }
 
 // ---------- Backup ----------
@@ -214,22 +357,24 @@ export function deleteHistoryEntry(id) {
 // O que vai para a nuvem (o treino em andamento fica só no celular)
 export function localSnapshot() {
     return {
+        profile: state.profile,
+        plans: state.plans,
         history: state.history,
         deletedIds: state.deletedIds,
-        exerciseData: state.exerciseData,
-        exerciseDataUpdatedAt: state.cloudMeta.exerciseDataUpdatedAt || 0
+        lastValues: state.lastValues
     };
 }
 
 // Substitui os dados pelos já mesclados com a nuvem; só redesenha se algo mudou
 export function replaceData(data, changed) {
-    state.history = data.history;
+    state.profile = data.profile;
+    state.plans = data.plans;
+    state.history = sortHistory(data.history);
     state.deletedIds = data.deletedIds;
-    state.exerciseData = data.exerciseData;
-    state.cloudMeta.exerciseDataUpdatedAt = data.exerciseDataUpdatedAt;
-    storageSet(KEYS.history, state.history);
-    storageSet(KEYS.deletedIds, state.deletedIds);
-    storageSet(KEYS.exerciseData, state.exerciseData);
-    saveCloudMeta();
+    state.lastValues = data.lastValues;
+    saveProfile();
+    savePlans();
+    saveHistory();
+    saveLastValues();
     if (changed) emit();
 }

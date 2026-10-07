@@ -1,23 +1,29 @@
+// Cópia congelada do código da v1 (commit 8063fa1), usada como referência nos testes da migração.
 // Sugestão de carga por progressão dupla, a partir do histórico de treinos finalizados.
-import { DEFAULT_INCREMENT } from './data/library.js';
 
-// Valores digitados na série w (0 = primeira série de trabalho)
+export const DEFAULT_INCREMENT = 2.5;
+
+// Reparte o campo antigo de reps ("8, 8, 6") por série; valor único vale para todas
+export function legacyRepsFor(repsStr, w) {
+    if (!repsStr) return '';
+    const parts = String(repsStr).split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0];
+    return parts[w] || '';
+}
+
+// Valores da série w (0 = primeira série de trabalho); dados antigos servem de semente
 export function getSetValues(saved, w) {
-    const s = (saved && saved.sets && saved.sets[w]) || {};
-    return { weight: s.weight || '', reps: s.reps || '' };
+    const s = (saved.sets && saved.sets[w]) || {};
+    return {
+        weight: s.weight !== undefined ? s.weight : (saved.weight || ''),
+        reps: s.reps !== undefined ? s.reps : legacyRepsFor(saved.reps, w)
+    };
 }
 
-// Faixa de reps: "10 a 12 repetições" → { min: 10, max: 12 }; número único → mín = máx
 export function parseRepRange(repsStr) {
-    const range = /(\d+)\s*a\s*(\d+)/.exec(repsStr || '');
-    if (range) return { min: Number(range[1]), max: Number(range[2]) };
-    const single = /^\s*(\d+)\s*(repetições|reps)?\s*$/.exec(repsStr || '');
-    return single ? { min: Number(single[1]), max: Number(single[1]) } : null;
-}
-
-// Texto da faixa gravado na ficha (o editor usa dois números)
-export function formatRepRange(min, max) {
-    return min === max ? `${min} repetições` : `${min} a ${max} repetições`;
+    const m = /(\d+)\s*a\s*(\d+)/.exec(repsStr || '');
+    return m ? { min: Number(m[1]), max: Number(m[2]) } : null;
 }
 
 // Primeiro número de um texto livre ("22,5kg" → 22.5); NaN se não houver
@@ -34,6 +40,17 @@ export function formatKg(n) {
     return formatWeight(n) + ' kg';
 }
 
+// Séries de trabalho de um exercício do histórico, aceitando o formato antigo
+export function historySetsFor(entryEx) {
+    if (Array.isArray(entryEx.sets)) return entryEx.sets;
+    const allDone = entryEx.setsDone >= entryEx.setsTotal;
+    const sets = [];
+    for (let w = 0; w < (entryEx.setsTotal || 0); w++) {
+        sets.push({ weight: entryEx.weight || '', reps: legacyRepsFor(entryEx.reps, w), done: allDone });
+    }
+    return sets;
+}
+
 // Resume uma sessão: carga de referência (maior carga) e se bateu o topo / falhou
 function evaluateSession(sets, ex, range) {
     const weights = sets.map((s) => parseNumber(s.weight)).filter((n) => !isNaN(n) && n > 0);
@@ -48,20 +65,19 @@ function evaluateSession(sets, ex, range) {
     };
 }
 
-// history: treinos finalizados, do mais novo para o mais antigo. ex: exercício da ficha
-// ({ exerciseId, series, reps, incremento }). Cada treino da ficha tem a própria progressão,
-// mesmo com o mesmo exercício em outro treino.
-export function computeSuggestion(history, workoutId, ex) {
+// history: treinos finalizados, do mais novo para o mais antigo. Cada treino (A/B/C/D) tem a
+// própria progressão, mesmo com exercícios de mesmo nome.
+export function computeSuggestion(history, workoutKey, ex) {
     const range = parseRepRange(ex.reps);
     if (!range) return null;
     const inc = ex.incremento || DEFAULT_INCREMENT;
 
     const recent = [];
     for (const entry of history) {
-        if (entry.workoutId !== workoutId || !Array.isArray(entry.exercises)) continue;
-        const entryEx = entry.exercises.find((e) => e.exerciseId === ex.exerciseId);
-        if (!entryEx || !Array.isArray(entryEx.sets)) continue;
-        const result = evaluateSession(entryEx.sets, ex, range);
+        if (entry.workout !== workoutKey || !Array.isArray(entry.exercises)) continue;
+        const entryEx = entry.exercises.find((e) => e.nome === ex.nome);
+        if (!entryEx) continue;
+        const result = evaluateSession(historySetsFor(entryEx), ex, range);
         if (result) recent.push(result);
         if (recent.length === 2) break;
     }

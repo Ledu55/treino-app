@@ -1,3 +1,4 @@
+// Cópia congelada do código da v1 (commit 8063fa1), usada como referência nos testes da migração.
 // Ficha atual (A/B/C/D). No item 6 do roadmap vira a primeira ficha do novo modelo de dados.
 export const workoutNames = {
     A: 'Treino A - Inferiores',

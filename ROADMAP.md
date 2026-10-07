@@ -5,11 +5,11 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 ## Onde estamos
 
 - PWA em Vite + Preact ([src/](src/)), publicado no GitHub Pages pelo GitHub Actions; o service worker ([src/sw.js](src/sw.js), gerado pelo `vite-plugin-pwa`) guarda o app em cache para uso offline e avisa quando há versão nova.
-- Ficha de treinos (A/B/C/D) escrita direto no código, em [src/data/treinos.js](src/data/treinos.js).
-- Dados no `localStorage`: últimos valores digitados, treino em andamento e histórico (limitado a 50 treinos).
+- Fichas com ids fixos, montadas a partir da biblioteca de exercícios ([src/data/exercises.json](src/data/exercises.json)); a ficha A/B/C/D virou a primeira ficha (e o primeiro modelo, em [src/data/templates.js](src/data/templates.js)).
+- Dados no `localStorage` (formato v2): perfil, fichas, histórico sem limite, últimos valores digitados e treino em andamento.
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
-- Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): um documento por usuário em `users/{uid}`, sincronizado com `mergeCloudData`.
+- Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): perfil em `users/{uid}`, um documento por ficha e por treino finalizado, sincronizados por [src/cloud.js](src/cloud.js) (só o que mudou) e mesclados por [src/sync.js](src/sync.js).
 - Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions.
 
 ## Princípios
@@ -110,34 +110,39 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 
 **Por quê:** é a base para fichas personalizadas, para o modo personal e para histórico sem limite.
 
-**Biblioteca de exercícios:** `data/exercises.json`, com id fixo, nome, GIF, instruções e incremento de carga. Hoje essas informações estão espalhadas no objeto `treinos`.
+**Biblioteca de exercícios:** [src/data/exercises.json](src/data/exercises.json), com id fixo, nome, grupo muscular, GIF, instruções e incremento de carga: os 21 exercícios da ficha atual, mais 36 comuns (sem GIF por enquanto) para o editor do item 7. Um exercício fora da biblioteca, criado pela pessoa, leva o próprio nome na ficha.
 
 **Firestore:**
 
 ```
-users/{uid}                    perfil: nome, isTrainer, trainers: { trainerUid: true }, lastSessionAt, schemaVersion
-users/{uid}/plans/{planId}     ficha: nome, treinos[{ id, nome, exercícios[{ exerciseId, séries, reps, descanso, obs }] }],
-                               createdBy, updatedBy, updatedAt, ativa
-users/{uid}/sessions/{id}      treino finalizado: data, planId, workoutId, exercícios[{ exerciseId, séries[{ kg, reps, feita }] }], obs
-users/{uid}/state/current      últimos valores digitados por exercício
-invites/{codigo}               convite de personal: trainerUid, expiresAt
+users/{uid}                    perfil: nome, titulo, activePlanId, lastSessionAt, profileUpdatedAt, schema,
+                               trainers: { trainerUid: true } (isTrainer entra no item 12)
+users/{uid}/plans/{planId}     ficha: nome, treinos[{ id, nome, exercicios[{ exerciseId, nome?, series, reps, descanso, obs }] }],
+                               createdBy, updatedBy, updatedAt, deleted?
+users/{uid}/sessions/{id}      treino finalizado: date, planId, workoutId, workoutNome, workoutNote, doneCount, totalCount,
+                               exercises[{ exerciseId, nome, note, sets[{ weight, reps, done }], setsDone, setsTotal }],
+                               updatedAt (apagado: só { deleted: true })
+users/{uid}/state/current      últimos valores digitados: values{ 'treino|exercício': { sets, note, updatedAt } }
+invites/{codigo}               convite de personal: trainerUid, expiresAt (item 12)
 ```
 
-- [ ] Ids fixos para fichas, treinos e exercícios. Hoje o histórico usa `"A|Agachamento"`, e renomear um exercício quebra a ligação.
-- [ ] Um documento por treino finalizado, o que elimina o limite de 50 treinos e o risco de passar de 1 MB num documento só.
-- [ ] Regras do Firestore:
+Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só busca o que mudou desde a anterior. Diferenças em relação ao plano: a ficha ativa fica no perfil (`activePlanId`) em vez de um campo `ativa` em cada ficha, para nunca haver duas ativas; a versão continua no campo `schema`, que o app antigo já lê; os nomes dos campos do treino seguem os que o código já usava.
+
+- [x] Ids fixos para fichas, treinos e exercícios. Os últimos valores passaram de `"A|Agachamento"` para `"A|agachamento"` (id do treino + id do exercício); os treinos da ficha migrada mantêm as letras como id.
+- [x] Um documento por treino finalizado, o que elimina o limite de 50 treinos e o risco de passar de 1 MB num documento só. Treino apagado vira `{ deleted: true }`, para os outros celulares saberem.
+- [x] Regras do Firestore ([firestore.rules](firestore.rules), testadas em [tests/rules/](tests/rules/firestore.rules.test.js) com aluno, personal autorizado, personal removido e pessoa sem vínculo):
   - o aluno lê e escreve tudo que é dele;
-  - um personal listado em `trainers` pode ler o perfil, ler o histórico e editar fichas, mas não pode apagar treinos nem alterar o perfil;
+  - um personal listado em `trainers` pode ler o perfil, ler o histórico e criar/editar fichas (com `updatedBy` = ele), mas não pode apagar fichas ou treinos, gravar treinos nem alterar o perfil;
   - só o próprio aluno grava a lista `trainers`.
-- [ ] Migração dos dados atuais: a ficha A/B/C/D vira a primeira ficha da usuária atual, e o histórico e os últimos valores passam para os novos ids. A sugestão de carga e o histórico devem continuar aparecendo iguais.
-- [ ] `lastSessionAt` no perfil, atualizado ao finalizar um treino, para a lista de alunos do personal (item 12) não precisar de uma consulta por aluno. O personal lista os alunos com `where('trainers.<uid>', '==', true)` em `users`.
-- [ ] **Decisão: armazenamento local.** O histórico deixa de ter limite, e o `localStorage` tem ~5 MB. Antes de decidir, fazer um teste rápido da opção 3:
+- [x] Migração dos dados atuais (`migrateV1toV2` em [src/migrations.js](src/migrations.js)): a ficha A/B/C/D vira a primeira ficha da usuária atual, e o histórico e os últimos valores passam para os novos ids. Testado contra uma cópia congelada do código da v1: a sugestão de carga e os valores dos campos saem iguais para todos os exercícios. No histórico, os treinos do formato antigo (uma carga por exercício) passam a mostrar uma linha por série, e o nome do treino aparece completo ("Treino A - Inferiores"). O backup v1 na nuvem é migrado na primeira sincronização e fica guardado em `previousPayload`.
+- [x] `lastSessionAt` no perfil, atualizado ao finalizar um treino, para a lista de alunos do personal (item 12) não precisar de uma consulta por aluno. O personal lista os alunos com `where('trainers.<uid>', '==', true)` em `users`.
+- [x] **Decisão: armazenamento local → `localStorage`** (opção 1). Um treino ocupa ~1 KB, então os ~5 MB dão para mais de 15 anos a 5 treinos por semana; se uma gravação falhar, o app avisa na tela. O teste da opção 3 (2026-10-07, no emulador) mostrou que ela quebra o princípio 1: sem internet o login anônimo falha, e o que é gravado antes do primeiro login some da vista e nunca é enviado; num segundo celular, vincular uma conta Google que já existe dá `credential-already-in-use` e os dados anônimos ficam presos. Ela também precisaria de armazenamento e mesclagem próprios, e o SDK (175 KB gzip) teria de carregar antes de mostrar o treino. As opções eram:
   1. `localStorage` (como hoje) + sincronização própria;
   2. IndexedDB + sincronização própria;
   3. cache offline do Firestore (`persistentLocalCache`) como único banco, com login anônimo vinculado depois à conta Google (`linkWithPopup`). Elimina o `mergeCloudData` e a fila de envio própria.
 
   Pontos a verificar na opção 3: o primeiro acesso sem internet (o login anônimo precisa de rede, e o princípio 1 não pode ser quebrado); o cache configurado sem limite (`CACHE_SIZE_UNLIMITED`), para não perder dados por coleta de lixo; transações não funcionam offline; "última gravação vence" por campo nas fichas; o peso do SDK na primeira abertura; o treino em andamento continua só local.
-- [ ] Adaptar `computeSuggestion` e a sincronização ao novo formato.
+- [x] Adaptar `computeSuggestion` e a sincronização ao novo formato. A sincronização não usa mais transação: busca o que mudou, mescla (`mergeData`, em [src/sync.js](src/sync.js)) e envia só o que mudou no celular, em lotes.
 
 **Pronto quando:** a usuária atual abre o app depois da atualização e tudo está igual, com os dados já no novo formato no celular e na nuvem.
 
@@ -226,8 +231,9 @@ invites/{codigo}               convite de personal: trainerUid, expiresAt
 | Ficha montada pelo personal | Só leitura na estrutura para o aluno, que registra cargas normalmente e pode duplicar a ficha para ter uma cópia própria |
 | Timer com a tela desligada | Fora do escopo; manter a tela ligada com Wake Lock (item 13) |
 | Ordem das fases | A reestruturação (item 3) continua separada do novo modelo de dados (item 6), para os testes garantirem que nada mudou |
+| Armazenamento local | `localStorage`, com o `storage.js` isolado para trocar por IndexedDB se um dia precisar (item 6) |
 | Recusados | Iniciar o timer de descanso automaticamente; modo escuro |
 
 ## Decisões em aberto
 
-- Armazenamento local: `localStorage`, IndexedDB ou cache offline do Firestore com login anônimo (item 6, depois de um teste rápido).
+Nenhuma no momento.

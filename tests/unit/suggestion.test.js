@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { computeSuggestion } from '../../src/progression.js';
 
 // Exercício de referência: 3 séries de 10 a 12, incremento padrão (2,5 kg)
-const SUPINO = { nome: 'Supino', series: 3, reps: '10 a 12 repetições' };
-const ELEVACAO = { nome: 'Elevação Lateral', series: 3, reps: '10 a 12 repetições', incremento: 1 };
+const SUPINO = { exerciseId: 'supino', series: 3, reps: '10 a 12 repetições' };
+const ELEVACAO = { exerciseId: 'elevacao-lateral', series: 3, reps: '10 a 12 repetições', incremento: 1 };
 
 let nextId = 1000;
 
@@ -12,12 +12,16 @@ function sets(...rows) {
     return rows.map(([weight, reps, done = true]) => ({ weight: String(weight), reps: String(reps), done }));
 }
 
-function entry(workout, nome, workSets) {
+// nome: 'Supino' ou 'Elevação Lateral' (o id vem de IDS)
+const IDS = { Supino: 'supino', 'Elevação Lateral': 'elevacao-lateral' };
+
+function entry(workoutId, nome, workSets) {
     return {
-        id: nextId--,
+        id: String(nextId--),
         date: new Date().toISOString(),
-        workout,
+        workoutId,
         exercises: [{
+            exerciseId: IDS[nome],
             nome,
             note: '',
             sets: workSets,
@@ -146,15 +150,4 @@ describe('computeSuggestion', () => {
         expect(suggest(history, SUPINO, 'B')).toBeNull();
     });
 
-    it('aceita o formato antigo do histórico (uma carga e reps por exercício)', () => {
-        const legacy = {
-            id: 1,
-            date: '2026-08-10T12:00:00.000Z',
-            workout: 'A',
-            exercises: [{ nome: 'Supino', weight: '40', reps: '12, 12, 12', note: '', setsDone: 3, setsTotal: 3 }]
-        };
-        const s = suggest([legacy]);
-        expect(s.action).toBe('up');
-        expect(s.weight).toBe(42.5);
-    });
 });

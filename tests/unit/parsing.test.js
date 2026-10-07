@@ -11,11 +11,24 @@ describe('parseRepRange', () => {
         expect({ ...app.parseRepRange('8a10') }).toEqual({ min: 8, max: 10 });
     });
 
+    it('número único vale como mínimo e máximo', () => {
+        expect({ ...app.parseRepRange('12 repetições') }).toEqual({ min: 12, max: 12 });
+        expect({ ...app.parseRepRange('30') }).toEqual({ min: 30, max: 30 });
+    });
+
     it('devolve null quando não há faixa', () => {
+        expect(app.parseRepRange('12 a cada lado, 3x')).toBeNull();
         expect(app.parseRepRange('até a falha')).toBeNull();
-        expect(app.parseRepRange('12 repetições')).toBeNull();
         expect(app.parseRepRange('')).toBeNull();
         expect(app.parseRepRange(undefined)).toBeNull();
+    });
+});
+
+describe('formatRepRange', () => {
+    it('volta a ser lido por parseRepRange', () => {
+        expect(app.formatRepRange(8, 10)).toBe('8 a 10 repetições');
+        expect(app.formatRepRange(12, 12)).toBe('12 repetições');
+        expect({ ...app.parseRepRange(app.formatRepRange(8, 10)) }).toEqual({ min: 8, max: 10 });
     });
 });
 

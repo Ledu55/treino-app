@@ -1,22 +1,18 @@
 import {
-    WARMUP_SETS, applyWeight, exerciseKey, getState, isExerciseDone, setExerciseNote, setSetValue, toggleSet
+    WARMUP_SETS, applyWeight, getState, isExerciseDone, isSetDone, setExerciseNote, setSetValue, toggleSet, valuesKey
 } from '../store.js';
 import { computeSuggestion, formatKg, formatWeight, getSetValues } from '../progression.js';
 import { formatTime, startTimer } from '../timer.js';
 import { useDebouncedField } from './hooks.js';
 import { showToast } from './Toast.jsx';
 
-const NO_IMAGE = 'https://placehold.co/600x300/e2e8f0/475569?text=Sem+Imagem';
-
 function TextField({ value, onSave, ...props }) {
     const field = useDebouncedField(value, onSave);
     return <input type="text" autocomplete="off" {...props} {...field} />;
 }
 
-function SetBox({ workoutKey, ex, setIndex, label, ariaLabel, warmup }) {
-    const session = getState().sessions[workoutKey];
-    const sets = session && session.sets && session.sets[ex.nome];
-    const active = !!(sets && sets[setIndex]);
+function SetBox({ workoutId, ex, setIndex, label, ariaLabel, warmup }) {
+    const active = isSetDone(workoutId, ex.exerciseId, setIndex);
     return (
         <button
             type="button"
@@ -24,7 +20,7 @@ function SetBox({ workoutKey, ex, setIndex, label, ariaLabel, warmup }) {
             data-set-index={setIndex}
             aria-pressed={active ? 'true' : 'false'}
             aria-label={ariaLabel}
-            onClick={() => toggleSet(workoutKey, ex, setIndex)}
+            onClick={() => toggleSet(workoutId, ex, setIndex)}
         >
             {label}
         </button>
@@ -42,12 +38,30 @@ function Suggestion({ suggestion, onApply }) {
     );
 }
 
-export function ExerciseCard({ workoutKey, ex, index }) {
-    const { exerciseData, history } = getState();
-    const key = exerciseKey(workoutKey, ex.nome);
-    const saved = exerciseData[key] || {};
-    const suggestion = computeSuggestion(history, workoutKey, ex);
-    const done = isExerciseDone(workoutKey, ex);
+// Sem GIF (exercício novo da biblioteca ou criado pela pessoa), mostra só as instruções
+function ExerciseDetails({ ex }) {
+    if (!ex.img && !ex.instrucoes) return null;
+    return (
+        <details class="gif-details">
+            <summary><span class="chev">▼</span> Ver exercício</summary>
+            {ex.img && (
+                <img
+                    src={ex.img} alt={`Imagem do exercício ${ex.nome}`} class="exercise-img" loading="lazy"
+                    onError={(e) => { e.currentTarget.hidden = true; }}
+                />
+            )}
+            {ex.instrucoes && <p class="exercise-instructions">{ex.instrucoes}</p>}
+        </details>
+    );
+}
+
+// ex: exercício da ficha já com os dados da biblioteca (store.js → workoutExercises)
+export function ExerciseCard({ workoutId, ex, index }) {
+    const { lastValues, history } = getState();
+    const key = valuesKey(workoutId, ex.exerciseId);
+    const saved = lastValues[key] || {};
+    const suggestion = computeSuggestion(history, workoutId, ex);
+    const done = isExerciseDone(workoutId, ex);
 
     function applySuggestion() {
         applyWeight(key, ex.series, formatWeight(suggestion.weight));
@@ -56,7 +70,7 @@ export function ExerciseCard({ workoutKey, ex, index }) {
 
     const warmups = [];
     for (let i = 0; i < WARMUP_SETS; i++) {
-        warmups.push(<SetBox key={i} workoutKey={workoutKey} ex={ex} setIndex={i} label={`Aquec. ${i + 1}`} warmup />);
+        warmups.push(<SetBox key={i} workoutId={workoutId} ex={ex} setIndex={i} label={`Aquec. ${i + 1}`} warmup />);
     }
 
     const rows = [];
@@ -64,7 +78,7 @@ export function ExerciseCard({ workoutKey, ex, index }) {
         const vals = getSetValues(saved, w);
         rows.push(
             <div class="set-row" key={w}>
-                <SetBox workoutKey={workoutKey} ex={ex} setIndex={WARMUP_SETS + w} label={`S${w + 1}`} ariaLabel={`Série ${w + 1}`} />
+                <SetBox workoutId={workoutId} ex={ex} setIndex={WARMUP_SETS + w} label={`S${w + 1}`} ariaLabel={`Série ${w + 1}`} />
                 <TextField
                     class="field-input set-weight-input" data-working-index={w} placeholder="kg" inputmode="text"
                     value={vals.weight} onSave={(v) => setSetValue(key, w, 'weight', v)}
@@ -84,16 +98,10 @@ export function ExerciseCard({ workoutKey, ex, index }) {
                 <span class="done-badge" aria-hidden="true">✔</span>
             </div>
 
-            <details class="gif-details">
-                <summary><span class="chev">▼</span> Ver exercício</summary>
-                <img
-                    src={ex.img} alt={`Imagem do exercício ${ex.nome}`} class="exercise-img" loading="lazy"
-                    onError={(e) => { e.currentTarget.src = NO_IMAGE; }}
-                />
-                {ex.instrucoes && <p class="exercise-instructions">{ex.instrucoes}</p>}
-            </details>
+            <ExerciseDetails ex={ex} />
 
             <div class="exercise-info">📊 {ex.series} séries de {ex.reps}</div>
+            {ex.obs && <div class="exercise-obs">📌 {ex.obs}</div>}
             {suggestion && <Suggestion suggestion={suggestion} onApply={applySuggestion} />}
             <div class="sets-container">{warmups}</div>
             <div class="set-rows">{rows}</div>

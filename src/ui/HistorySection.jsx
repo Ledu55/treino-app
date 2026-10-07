@@ -7,15 +7,11 @@ function formatEntryDate(isoDate) {
 }
 
 function hasData(ex) {
-    return ex.setsDone > 0 || ex.weight || ex.reps || ex.note
-        || (Array.isArray(ex.sets) && ex.sets.some((s) => s.weight || s.reps || s.done));
+    return ex.setsDone > 0 || ex.note || ex.sets.some((s) => s.weight || s.reps || s.done);
 }
 
-// Carga e reps de cada série; treinos antigos têm uma carga e reps por exercício
+// Carga e reps de cada série
 function WeightCell({ ex }) {
-    if (!Array.isArray(ex.sets)) {
-        return <>{ex.weight}{ex.reps && <><br /><span class="entry-reps">{ex.reps} reps</span></>}</>;
-    }
     return ex.sets.map((s, w) => (
         <span class={'entry-set' + (s.done ? '' : ' entry-set-miss')}>
             {s.done ? '✓' : '·'} S{w + 1}: {s.weight || '—'}{s.reps ? ` × ${s.reps}` : ''}
@@ -32,7 +28,7 @@ function HistoryEntry({ entry }) {
         <details class="history-entry">
             <summary>
                 <span class="entry-date">{formatEntryDate(entry.date)}</span>
-                <span>Treino {entry.workout}</span>
+                <span>{entry.workoutNome}</span>
                 <span class="entry-meta">{entry.doneCount}/{entry.totalCount} exercícios</span>
             </summary>
             <div class="history-entry-body">

@@ -35,7 +35,7 @@ test('carga, reps e observação digitadas ficam salvas', async ({ page }) => {
     await card.locator('.set-weight-input').nth(0).fill('40');
     await card.locator('.set-reps-input').nth(0).fill('8');
     await card.locator('.exercise-note-input').fill('banco no 4');
-    await waitForSaved(page, 'A|Agachamento', { note: 'banco no 4', sets: [{ weight: '40', reps: '8' }] });
+    await waitForSaved(page, 'A|agachamento', { note: 'banco no 4', sets: [{ weight: '40', reps: '8' }] });
 
     await page.reload();
     const reopened = exerciseCard(page, AGACHAMENTO);
@@ -49,17 +49,17 @@ test('pausa no meio da digitação não come o espaço', async ({ page }) => {
     const note = exerciseCard(page, AGACHAMENTO).locator('.exercise-note-input');
     // O campo salva 300 ms depois da última tecla, sem os espaços das pontas
     await note.pressSequentially('banco ');
-    await waitForSaved(page, 'A|Agachamento', { note: 'banco' });
+    await waitForSaved(page, 'A|agachamento', { note: 'banco' });
     await note.pressSequentially('no 4');
     await expect(note).toHaveValue('banco no 4');
-    await waitForSaved(page, 'A|Agachamento', { note: 'banco no 4' });
+    await waitForSaved(page, 'A|agachamento', { note: 'banco no 4' });
 });
 
 test('o que foi digitado logo antes de trocar de treino fica salvo', async ({ page }) => {
     await page.goto(APP);
     await exerciseCard(page, AGACHAMENTO).locator('.set-weight-input').nth(0).fill('50');
     await page.getByLabel('Escolher treino').selectOption('B');
-    await waitForSaved(page, 'A|Agachamento', { sets: [{ weight: '50' }] });
+    await waitForSaved(page, 'A|agachamento', { sets: [{ weight: '50' }] });
 });
 
 test('timer de descanso: abre, ganha +30s e fecha', async ({ page }) => {
@@ -93,7 +93,7 @@ test('finalizar o treino guarda no histórico e mostra a sugestão de carga', as
     // Topo da faixa (8 reps) nas 3 séries → sugestão de subir 2,5 kg
     await page.locator('#workout-note').fill('treino bom');
     await doSets(card, TOP_SETS);
-    await waitForSaved(page, 'A|Agachamento', savedSets(TOP_SETS));
+    await waitForSaved(page, 'A|agachamento', savedSets(TOP_SETS));
     await page.getByRole('button', { name: /Finalizar treino/ }).click();
     await expect(page.locator('#toast')).toHaveText(/Treino salvo/);
 
@@ -158,7 +158,7 @@ test('apagar um treino do histórico remove a sugestão que vinha dele', async (
     await page.goto(APP);
     const card = exerciseCard(page, AGACHAMENTO);
     await doSets(card, TOP_SETS);
-    await waitForSaved(page, 'A|Agachamento', savedSets(TOP_SETS));
+    await waitForSaved(page, 'A|agachamento', savedSets(TOP_SETS));
     await page.getByRole('button', { name: /Finalizar treino/ }).click();
     await expect(card.locator('.suggestion')).toBeVisible();
 
@@ -186,6 +186,9 @@ test('cada treino tem sua sessão, e o app reabre no último treino escolhido', 
         .toHaveAttribute('aria-pressed', 'true');
 });
 
+test.describe('celular sem dados do app', () => {
+    test.use({ existingUser: false });
+
 test('dados de uma versão mais nova do app: não abre o treino nem altera nada', async ({ page }) => {
     const data = {
         'treino.schemaVersion': { version: 999 },
@@ -201,4 +204,5 @@ test('dados de uma versão mais nova do app: não abre o treino nem altera nada'
         Object.keys(localStorage).map((k) => [k, JSON.parse(localStorage.getItem(k))])
     ));
     expect(stored).toEqual(data);
+});
 });
