@@ -14,7 +14,7 @@ export function BlockedScreen({ reason }) {
     return (
         <>
             <header>
-                <h1>Treino do Meu Benzinho</h1>
+                <h1>Meu Treino</h1>
             </header>
             <div class="container">
                 <div class="workout-footer blocked">

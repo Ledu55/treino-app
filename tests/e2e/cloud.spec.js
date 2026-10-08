@@ -135,6 +135,30 @@ test('login e backup em localhost usam o emulador, nunca a produção', async ({
     expect(realRequests).toEqual([]);
 });
 
+test('primeiro acesso com uma conta que já tem dados: restaura em vez de configurar', async ({ page, request }) => {
+    await page.goto(`${APP}?emulator`);
+    await expect(page.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    const uid = await signIn(page);
+    await page.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect.poll(async () => (await readCollection(request, `users/${uid}/sessions`)).length, { timeout: 15000 }).toBe(1);
+
+    // Celular novo, sem nenhum dado
+    const fresh = await page.context().browser().newPage();
+    await fresh.goto(`${APP}?emulator`);
+    await expect(fresh.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
+    await signIn(fresh);
+    await expect(fresh.locator('h1')).toHaveText('Treino do Meu Benzinho');
+    await expect(fresh.locator('#toast')).toHaveText('Seus treinos foram restaurados ☁️');
+    await expect(fresh.getByLabel('Escolher treino')).toHaveValue('A');
+    await fresh.getByText('Histórico de treinos').click();
+    await expect(fresh.locator('.history-entry')).toHaveCount(1);
+
+    // Nada foi duplicado na nuvem
+    await fresh.waitForTimeout(2500);
+    expect((await readCollection(request, `users/${uid}/plans`)).map((p) => p.id)).toEqual(['abcd']);
+    await fresh.close();
+});
+
 test('backup da v1 na nuvem é migrado e guardado como cópia', async ({ page, request }) => {
     // Backup no formato antigo: um documento com tudo em payload
     const uid = await createAccount(request);

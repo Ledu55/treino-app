@@ -10,6 +10,7 @@ import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen } from
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
+import { Welcome } from './Welcome.jsx';
 import { useDebouncedField, useSubscription } from './hooks.js';
 import { navigate, planPath, useRoute } from './router.js';
 
@@ -119,12 +120,14 @@ export function App() {
     useSubscription(subscribe);
     const route = useRoute();
     const screenKey = JSON.stringify(route);
+    const title = appTitle();
     // Cada tela começa do topo
     useEffect(() => { window.scrollTo(0, 0); }, [screenKey]);
+    useEffect(() => { document.title = title; }, [title]);
 
     return (
         <>
-            <Screen key={screenKey} route={route} />
+            {getState().profile ? <Screen key={screenKey} route={route} /> : <Welcome />}
             <UpdateBanner />
             <TimerBar />
             <Toast />

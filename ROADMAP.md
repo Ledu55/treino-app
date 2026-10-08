@@ -158,10 +158,10 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 
 ### 8. ✨ Primeiro acesso
 
-- [ ] Tela de boas-vindas na primeira abertura: nome, "Entrar com Google" (recomendado, mas opcional) e a escolha entre um modelo e uma ficha do zero.
-- [ ] Título e textos usando o nome da pessoa (sai "Treino do Meu Benzinho" do código).
-- [ ] Ao entrar com uma conta que já tem dados na nuvem, restaurar os dados em vez de mostrar a configuração inicial.
-- [ ] Depois do primeiro acesso, o app abre direto no treino, sem pedir login de novo.
+- [x] Tela de boas-vindas na primeira abertura ([src/ui/Welcome.jsx](src/ui/Welcome.jsx)): nome, "Entrar com Google" (recomendado, mas opcional; sem internet, fica para depois) e a escolha entre um modelo e uma ficha do zero (que abre o editor).
+- [x] Título e textos usando o nome da pessoa: "Treino de <nome>", ou um título escolhido no perfil. "Treino do Meu Benzinho" saiu das telas e só existe na migração, que o põe como título da usuária atual.
+- [x] Ao entrar com uma conta que já tem dados na nuvem (inclusive um backup v1), restaurar os dados em vez de mostrar a configuração inicial. "Começar" fica desativado enquanto a nuvem está sendo lida, para não criar uma ficha repetida.
+- [x] Depois do primeiro acesso, o app abre direto no treino, sem pedir login de novo.
 
 **Pronto quando:** alguém que nunca viu o app instala, configura e registra um treino em poucos minutos.
 
