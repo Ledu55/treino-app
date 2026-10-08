@@ -148,11 +148,11 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 
 ### 7. ✨ Editor de treinos + modelos prontos
 
-- [ ] Criar, renomear, duplicar e apagar fichas; escolher a ficha ativa.
-- [ ] Dentro da ficha: criar treinos, reordenar e escolher exercícios da biblioteca com busca, além de definir séries, faixa de reps, descanso e observações.
-- [ ] Modelos prontos (a ficha A/B/C/D atual vira o primeiro modelo).
-- [ ] Reordenar com botões ↑/↓ (arrastar e soltar é opcional, só se fizer falta no uso).
-- [ ] Componentes do editor reaproveitáveis pelo modo personal (item 12).
+- [x] Criar, renomear, duplicar e apagar fichas; escolher a ficha ativa (botão 📋 no topo do treino → tela "Fichas", que também tem o perfil: nome e título do app).
+- [x] Dentro da ficha: criar treinos, reordenar e escolher exercícios da biblioteca com busca (sem acento, por nome ou grupo muscular), além de definir séries, faixa de reps (mín./máx.), descanso e observações (aparecem no cartão do exercício). Exercício fora da biblioteca: "Criar exercício" com o nome digitado.
+- [x] Modelos prontos em [src/data/templates.js](src/data/templates.js): a ficha A/B/C/D, "Corpo inteiro A/B" e "ABC: empurrar, puxar e pernas".
+- [x] Reordenar com botões ↑/↓ (arrastar e soltar é opcional, só se fizer falta no uso).
+- [x] Componentes do editor reaproveitáveis pelo modo personal (item 12): [src/ui/editor/PlanEditor.jsx](src/ui/editor/PlanEditor.jsx) recebe a ficha e `onChange`, sem ler o store. As telas usam o `#` da URL, então o botão voltar do Android funciona.
 
 **Pronto quando:** uma pessoa nova consegue montar a própria ficha do zero no celular sem ajuda.
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'preact/hooks';
 import {
     appTitle, countDone, finishWorkout, getActivePlan, getCurrentWorkout, getState, selectWorkout, setWorkoutNote,
     subscribe, workoutExercises
@@ -5,14 +6,38 @@ import {
 import { CloudSection } from './CloudSection.jsx';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
+import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen } from './PlansScreen.jsx';
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
 import { useDebouncedField, useSubscription } from './hooks.js';
+import { navigate, planPath, useRoute } from './router.js';
 
 function WorkoutNote({ workoutId, value }) {
     const field = useDebouncedField(value, (text) => setWorkoutNote(workoutId, text), { trim: false });
     return <textarea id="workout-note" placeholder="Como foi o treino hoje? (energia, dores, ajustes...)" {...field} />;
+}
+
+// Ficha ativa sem treinos, treino sem exercícios ou nenhuma ficha: leva ao editor
+function EmptyWorkout({ plan, workout }) {
+    let text;
+    let action;
+    if (!plan) {
+        text = 'Nenhuma ficha ativa.';
+        action = ['Escolher ou criar ficha', '#fichas'];
+    } else if (!workout) {
+        text = `A ficha "${plan.nome}" ainda não tem treinos.`;
+        action = ['Editar ficha', planPath(plan.id)];
+    } else {
+        text = `O "${workout.nome}" ainda não tem exercícios.`;
+        action = ['Adicionar exercícios', planPath(plan.id, workout.id)];
+    }
+    return (
+        <div class="workout-footer empty-workout">
+            <p>{text}</p>
+            <button type="button" class="finish-btn" onClick={() => navigate(action[1])}>{action[0]}</button>
+        </div>
+    );
 }
 
 function WorkoutScreen() {
@@ -33,6 +58,7 @@ function WorkoutScreen() {
     return (
         <>
             <header>
+                <button type="button" class="header-btn" aria-label="Fichas" title="Fichas" onClick={() => navigate('#fichas')}>📋</button>
                 <h1>{appTitle()}</h1>
                 {workout && (
                     <>
@@ -53,7 +79,7 @@ function WorkoutScreen() {
             </header>
 
             <div class="container">
-                {workout ? (
+                {exercises.length > 0 ? (
                     <>
                         <div id="workout-container">
                             {exercises.map((ex, index) => (
@@ -64,13 +90,11 @@ function WorkoutScreen() {
                         <div class="workout-footer">
                             <h3>📝 Observações do treino</h3>
                             <WorkoutNote key={workout.id} workoutId={workout.id} value={(session && session.workoutNote) || ''} />
-                            <button class="finish-btn" onClick={finish} disabled={exercises.length === 0}>✅ Finalizar treino</button>
+                            <button class="finish-btn" onClick={finish}>✅ Finalizar treino</button>
                         </div>
                     </>
                 ) : (
-                    <div class="workout-footer">
-                        <p>Nenhuma ficha ativa.</p>
-                    </div>
+                    <EmptyWorkout plan={plan} workout={workout} />
                 )}
 
                 <HistorySection />
@@ -81,11 +105,26 @@ function WorkoutScreen() {
     );
 }
 
+function Screen({ route }) {
+    switch (route.name) {
+        case 'plans': return <PlansScreen />;
+        case 'plan': return <PlanEditorScreen planId={route.planId} />;
+        case 'workout': return <WorkoutEditorScreen planId={route.planId} workoutId={route.workoutId} />;
+        case 'picker': return <PickerScreen planId={route.planId} workoutId={route.workoutId} />;
+        default: return <WorkoutScreen />;
+    }
+}
+
 export function App() {
     useSubscription(subscribe);
+    const route = useRoute();
+    const screenKey = JSON.stringify(route);
+    // Cada tela começa do topo
+    useEffect(() => { window.scrollTo(0, 0); }, [screenKey]);
+
     return (
         <>
-            <WorkoutScreen />
+            <Screen key={screenKey} route={route} />
             <UpdateBanner />
             <TimerBar />
             <Toast />

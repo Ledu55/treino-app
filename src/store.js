@@ -1,7 +1,7 @@
 // Estado do app (dados locais + treino escolhido) e as ações que o alteram. JS puro: as telas
 // (src/ui) assinam as mudanças com subscribe(); a nuvem (cloud.js) é avisada por onDataChange.
 import { KEYS, prepareLocalData, storageSet } from './storage.js';
-import { resolveExercise } from './data/library.js';
+import { getLibraryExercise, resolveExercise } from './data/library.js';
 import { getTemplate } from './data/templates.js';
 import { getSetValues } from './progression.js';
 import { sortHistory } from './sync.js';
@@ -102,6 +102,19 @@ export function getPlan(planId) {
 export function listPlans() {
     return Object.values(state.plans).filter((p) => !p.deleted)
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+// Exercícios criados pela pessoa (fora da biblioteca), em qualquer ficha
+export function listCustomExercises() {
+    const found = new Map();
+    for (const plan of listPlans()) {
+        for (const workout of plan.treinos) {
+            for (const ex of workout.exercicios) {
+                if (ex.nome && !getLibraryExercise(ex.exerciseId)) found.set(ex.exerciseId, { exerciseId: ex.exerciseId, nome: ex.nome });
+            }
+        }
+    }
+    return Array.from(found.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export function getActivePlan() {

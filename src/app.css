@@ -682,3 +682,303 @@ select {
     line-height: 1.45;
     color: var(--text-light);
 }
+
+/* ---------- Fichas e editor ---------- */
+
+header { position: relative; }
+
+.header-btn {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    width: 2.3rem;
+    height: 2.3rem;
+    background-color: rgba(255, 255, 255, 0.18);
+    border: none;
+    border-radius: 999px;
+    font-size: 1.05rem;
+    cursor: pointer;
+}
+
+header h1 { padding: 0 2.4rem; }
+
+.back-btn, .editor-item-main, .icon-btn, .editor-add-btn, .picker-item, .template-item, .plan-btn {
+    font-family: inherit;
+}
+
+.screen-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+    padding: 0.9rem 0.8rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.screen-header h1 {
+    margin: 0;
+    padding: 0;
+    font-size: 1.1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.back-btn {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.18);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.exercise-obs {
+    font-size: 0.85rem;
+    color: var(--text);
+    background-color: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    margin-bottom: 0.7rem;
+}
+
+.empty-workout p { margin-top: 0; color: var(--text-light); }
+
+.editor { margin-bottom: 1.2rem; }
+
+.editor-heading {
+    font-size: 1rem;
+    margin: 1.3rem 0 0.6rem;
+    color: var(--text);
+}
+
+.editor-empty { color: var(--text-light); font-size: 0.9rem; }
+
+.editor-field {
+    display: block;
+    margin-bottom: 0.7rem;
+}
+
+.editor-field > span {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+}
+
+.editor-field .field-input { width: 100%; }
+
+select.editor-select {
+    width: 100%;
+    max-width: none;
+    padding: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: none;
+    background-color: white;
+}
+
+.editor-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.8rem;
+}
+
+.editor-item {
+    display: flex;
+    align-items: stretch;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.editor-item-main {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.65rem 0.8rem;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.editor-item-main strong { display: block; color: var(--primary-dark); }
+.editor-item-main span { font-size: 0.8rem; color: var(--text-light); }
+
+.icon-btn {
+    flex-shrink: 0;
+    min-width: 2.4rem;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--text);
+}
+
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+.icon-btn.danger { color: var(--danger); }
+
+.editor-add-btn {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    margin: 0.6rem 0;
+    border: 2px dashed var(--primary);
+    border-radius: 10px;
+    background-color: transparent;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.editor-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.8rem 0.9rem 0.2rem;
+    margin-bottom: 0.8rem;
+}
+
+.editor-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.6rem;
+}
+
+.editor-card-title h3 {
+    flex: 1;
+    margin: 0;
+    font-size: 1rem;
+    color: var(--primary-dark);
+}
+
+.editor-card-title .icon-btn { height: 2.2rem; }
+
+.editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.6rem;
+}
+
+.picker-search { width: 100%; font-size: 1rem; margin-bottom: 0.4rem; }
+
+.picker-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.4rem 0;
+}
+
+.picker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.6rem;
+    width: 100%;
+    text-align: left;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.35rem;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.picker-item:disabled { opacity: 0.5; cursor: default; }
+.picker-name { font-weight: 600; }
+.picker-detail { font-size: 0.75rem; color: var(--text-light); white-space: nowrap; }
+
+.template-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.6rem;
+}
+
+.template-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background-color: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.45rem;
+    cursor: pointer;
+    color: var(--text);
+}
+
+.template-item strong { display: block; font-size: 0.95rem; }
+.template-item span { font-size: 0.8rem; color: var(--text-light); }
+.template-item.selected { border-color: var(--primary); background-color: #eff6ff; }
+
+.plan-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.8rem;
+}
+
+.plan-card.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+
+.plan-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.plan-card-title h3 { margin: 0; font-size: 1.05rem; color: var(--primary-dark); }
+
+.plan-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    background-color: var(--primary);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+}
+
+.plan-card-detail { font-size: 0.82rem; color: var(--text-light); margin: 0.35rem 0 0.7rem; }
+
+.plan-card-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.plan-btn {
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.plan-btn.primary { background-color: var(--primary); border-color: var(--primary); color: white; }
+.plan-btn.danger { color: var(--danger); }
+.plan-btn.wide { display: block; width: 100%; padding: 0.75rem; font-size: 0.95rem; }
+
+.new-plan {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.2rem 1rem 0.9rem;
+    margin: 0.6rem 0;
+}
+
+.profile-section { margin-top: 1.6rem; }
