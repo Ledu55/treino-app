@@ -259,6 +259,33 @@ export function finishWorkout(workout) {
     emit();
 }
 
+// Corrige um treino já finalizado: change(draft) pode mudar carga, reps, séries feitas e
+// observações. A sugestão de carga é calculada a partir do histórico, então acompanha a edição.
+export function updateHistoryEntry(id, change) {
+    const index = state.history.findIndex((entry) => entry.id === id);
+    if (index < 0) return;
+    const before = state.history[index];
+    const draft = structuredClone(before);
+    change(draft);
+
+    // As contagens só são refeitas onde as séries feitas mudaram: treinos antigos migrados da v1
+    // podem ter uma contagem que não dá para tirar das séries
+    const doneFlags = (ex) => ex.sets.map((s) => !!s.done).join();
+    let doneChanged = false;
+    draft.exercises.forEach((ex, i) => {
+        if (doneFlags(ex) === doneFlags(before.exercises[i])) return;
+        ex.setsDone = ex.sets.filter((s) => s.done).length;
+        doneChanged = true;
+    });
+    if (doneChanged) draft.doneCount = draft.exercises.filter((ex) => ex.setsTotal > 0 && ex.setsDone >= ex.setsTotal).length;
+
+    draft.updatedAt = Date.now();
+    state.history[index] = draft;
+    saveHistory();
+    markDirty('history', id);
+    emit();
+}
+
 export function deleteHistoryEntry(id) {
     state.history = state.history.filter((entry) => entry.id !== id);
     state.deletedIds.push(id);

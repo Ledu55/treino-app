@@ -170,6 +170,55 @@ test('apagar um treino do histórico remove a sugestão que vinha dele', async (
     await expect(exerciseCard(page, AGACHAMENTO).locator('.suggestion')).toHaveCount(0);
 });
 
+test('corrigir um treino do histórico atualiza a sugestão de carga', async ({ page }) => {
+    await page.goto(APP);
+    const card = exerciseCard(page, AGACHAMENTO);
+    await doSets(card, TOP_SETS);
+    await waitForSaved(page, 'A|agachamento', savedSets(TOP_SETS));
+    await page.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect(card.locator('.suggestion')).toContainText('42,5 kg');
+
+    await page.getByText('Histórico de treinos').click();
+    const entry = page.locator('.history-entry').first();
+    await entry.locator('summary').click();
+    await entry.getByRole('button', { name: /Editar/ }).click();
+
+    // Na verdade a 3ª série foi de 6 reps e a observação ficou faltando
+    const editor = entry.locator(`.history-editor-exercise[data-exercise="${AGACHAMENTO}"]`);
+    await expect(editor.getByLabel('Carga da série 1')).toHaveValue('40');
+    await editor.getByLabel('Reps da série 3').fill('6');
+    await editor.locator('.exercise-note-input').fill('banco no 4');
+    await entry.getByRole('button', { name: 'Salvar' }).click();
+    await expect(page.locator('#toast')).toHaveText('Treino corrigido');
+
+    await expect(entry).toContainText('S3: 40 × 6');
+    await expect(entry).toContainText('banco no 4');
+    await expect(card.locator('.suggestion')).toHaveClass(/suggestion-keep/);
+    await expect(card.locator('.suggestion')).toContainText('40 kg');
+    // Os últimos valores digitados no treino não mudam com a correção do histórico
+    await expect(card.locator('.set-reps-input').nth(2)).toHaveValue('8');
+
+    // Desmarcar uma série tira o exercício dos concluídos
+    await entry.getByRole('button', { name: /Editar/ }).click();
+    await editor.getByRole('button', { name: 'Série 2 feita' }).click();
+    await expect(editor.getByRole('button', { name: 'Série 2 feita' })).toHaveAttribute('aria-pressed', 'false');
+    await entry.getByRole('button', { name: 'Salvar' }).click();
+    await expect(entry.locator('.entry-meta')).toHaveText('0/6 exercícios');
+
+    // Cancelar descarta o que foi digitado
+    await entry.getByRole('button', { name: /Editar/ }).click();
+    await editor.getByLabel('Carga da série 1').fill('99');
+    await entry.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(entry).not.toContainText('99');
+
+    await page.reload();
+    await page.getByText('Histórico de treinos').click();
+    await page.locator('.history-entry summary').first().click();
+    await expect(page.locator('.history-entry').first()).toContainText('S3: 40 × 6');
+    await expect(page.locator('.history-entry').first()).toContainText('✓ S1');
+    await expect(page.locator('.history-entry').first()).toContainText('· S2');
+});
+
 test('cada treino tem sua sessão, e o app reabre no último treino escolhido', async ({ page }) => {
     await page.goto(APP);
     await exerciseCard(page, AGACHAMENTO).getByRole('button', { name: 'Série 1', exact: true }).click();

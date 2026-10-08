@@ -503,8 +503,13 @@ select {
     font-style: italic;
 }
 
-.delete-entry-btn {
+.history-entry-actions {
+    display: flex;
+    gap: 0.5rem;
     margin-top: 0.7rem;
+}
+
+.edit-entry-btn, .delete-entry-btn {
     padding: 0.4rem 0.8rem;
     background: none;
     border: 1px solid var(--border);
@@ -514,6 +519,29 @@ select {
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
+}
+
+.edit-entry-btn { color: var(--primary-dark); }
+
+.history-editor-exercise {
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 0 0.8rem;
+}
+
+.history-editor-exercise h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    color: var(--primary-dark);
+}
+
+.history-editor-exercise .set-rows { margin-bottom: 0.5rem; }
+
+.history-editor-note {
+    display: block;
+    width: 100%;
+    min-height: 4rem;
+    margin-bottom: 0.7rem;
+    resize: vertical;
 }
 
 [hidden] { display: none !important; }

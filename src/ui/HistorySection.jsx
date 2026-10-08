@@ -1,4 +1,6 @@
-import { deleteHistoryEntry, getState } from '../store.js';
+import { useState } from 'preact/hooks';
+import { deleteHistoryEntry, getState, updateHistoryEntry } from '../store.js';
+import { showToast } from './Toast.jsx';
 
 function formatEntryDate(isoDate) {
     const date = new Date(isoDate);
@@ -19,7 +21,84 @@ function WeightCell({ ex }) {
     ));
 }
 
+// Correção de um treino finalizado. Mostra todos os exercícios (inclusive os que ficaram em
+// branco) e só grava ao tocar em "Salvar".
+function HistoryEntryEditor({ entry, onClose }) {
+    const [draft, setDraft] = useState(() => structuredClone(entry));
+
+    function change(update) {
+        setDraft((current) => {
+            const next = structuredClone(current);
+            update(next);
+            return next;
+        });
+    }
+
+    function save() {
+        const clean = (text) => String(text || '').trim();
+        updateHistoryEntry(entry.id, (target) => {
+            target.workoutNote = clean(draft.workoutNote);
+            target.exercises = draft.exercises.map((ex) => ({
+                ...ex,
+                note: clean(ex.note),
+                sets: ex.sets.map((s) => ({ ...s, weight: clean(s.weight), reps: clean(s.reps) }))
+            }));
+        });
+        showToast('Treino corrigido');
+        onClose();
+    }
+
+    return (
+        <div class="history-editor">
+            {draft.exercises.map((ex, i) => (
+                <div class="history-editor-exercise" key={ex.exerciseId || i} data-exercise={ex.nome}>
+                    <h4>{ex.nome}</h4>
+                    <div class="set-rows">
+                        {ex.sets.map((s, w) => (
+                            <div class="set-row" key={w}>
+                                <button
+                                    type="button" class={'set-box' + (s.done ? ' active' : '')}
+                                    aria-pressed={s.done ? 'true' : 'false'} aria-label={`Série ${w + 1} feita`}
+                                    onClick={() => change((d) => { d.exercises[i].sets[w].done = !s.done; })}
+                                >
+                                    S{w + 1}
+                                </button>
+                                <input
+                                    type="text" autocomplete="off" inputmode="text" placeholder="kg"
+                                    class="field-input set-weight-input" aria-label={`Carga da série ${w + 1}`} value={s.weight || ''}
+                                    onInput={(e) => change((d) => { d.exercises[i].sets[w].weight = e.currentTarget.value; })}
+                                />
+                                <input
+                                    type="text" autocomplete="off" inputmode="text" placeholder="reps"
+                                    class="field-input set-reps-input" aria-label={`Reps da série ${w + 1}`} value={s.reps || ''}
+                                    onInput={(e) => change((d) => { d.exercises[i].sets[w].reps = e.currentTarget.value; })}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <input
+                        type="text" autocomplete="off" placeholder="Observações"
+                        class="field-input exercise-note-input" value={ex.note || ''}
+                        onInput={(e) => change((d) => { d.exercises[i].note = e.currentTarget.value; })}
+                    />
+                </div>
+            ))}
+            <textarea
+                class="field-input history-editor-note" placeholder="Como foi o treino?" aria-label="Observação do treino"
+                value={draft.workoutNote || ''}
+                onInput={(e) => change((d) => { d.workoutNote = e.currentTarget.value; })}
+            />
+            <div class="plan-card-actions">
+                <button type="button" class="plan-btn primary" onClick={save}>Salvar</button>
+                <button type="button" class="plan-btn" onClick={onClose}>Cancelar</button>
+            </div>
+        </div>
+    );
+}
+
 function HistoryEntry({ entry }) {
+    const [editing, setEditing] = useState(false);
+
     function remove() {
         if (confirm('Apagar este treino do histórico?')) deleteHistoryEntry(entry.id);
     }
@@ -32,22 +111,29 @@ function HistoryEntry({ entry }) {
                 <span class="entry-meta">{entry.doneCount}/{entry.totalCount} exercícios</span>
             </summary>
             <div class="history-entry-body">
-                <table>
-                    <tbody>
-                        {entry.exercises.filter(hasData).map((ex) => (
-                            <tr>
-                                <td>
-                                    {ex.nome}<br />
-                                    {ex.note && <span class="entry-note">{ex.note}</span>}
-                                </td>
-                                <td class="entry-weight"><WeightCell ex={ex} /></td>
-                                <td>{ex.setsDone}/{ex.setsTotal}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {entry.workoutNote && <p class="history-workout-note">"{entry.workoutNote}"</p>}
-                <button class="delete-entry-btn" onClick={remove}>🗑️ Apagar</button>
+                {editing ? <HistoryEntryEditor entry={entry} onClose={() => setEditing(false)} /> : (
+                    <>
+                        <table>
+                            <tbody>
+                                {entry.exercises.filter(hasData).map((ex) => (
+                                    <tr>
+                                        <td>
+                                            {ex.nome}<br />
+                                            {ex.note && <span class="entry-note">{ex.note}</span>}
+                                        </td>
+                                        <td class="entry-weight"><WeightCell ex={ex} /></td>
+                                        <td>{ex.setsDone}/{ex.setsTotal}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {entry.workoutNote && <p class="history-workout-note">"{entry.workoutNote}"</p>}
+                        <div class="history-entry-actions">
+                            <button class="edit-entry-btn" onClick={() => setEditing(true)}>✏️ Editar</button>
+                            <button class="delete-entry-btn" onClick={remove}>🗑️ Apagar</button>
+                        </div>
+                    </>
+                )}
             </div>
         </details>
     );

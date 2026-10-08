@@ -173,8 +173,10 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 
 **Por quê:** um erro de digitação muda a sugestão de carga do próximo treino, e hoje a única saída é apagar o treino inteiro.
 
-- [ ] Editar carga, reps, séries feitas e observações de um treino do histórico.
-- [ ] Recalcular a sugestão de carga depois da edição.
+- [x] Editar carga, reps, séries feitas e observações de um treino do histórico: botão "✏️ Editar" no treino aberto no histórico, com todos os exercícios (inclusive os que ficaram em branco) e a observação do treino; só grava ao tocar em "Salvar" (`updateHistoryEntry` em [src/store.js](src/store.js)). Os últimos valores digitados no treino em andamento não mudam.
+- [x] Recalcular a sugestão de carga depois da edição: ela já é calculada a partir do histórico, então acompanha a correção. As contagens (séries feitas por exercício, exercícios concluídos) só são refeitas onde as séries marcadas mudaram, porque os treinos antigos migrados da v1 têm contagens que não dá para tirar das séries. A edição leva `updatedAt` novo e vai para a nuvem como qualquer mudança (vence o editado por último).
+
+**Pronto quando:** um erro de digitação num treino finalizado se corrige no próprio histórico, e a sugestão do próximo treino já sai certa. Testado em [tests/unit/edit-history.test.js](tests/unit/edit-history.test.js) e no teste de ponta a ponta "corrigir um treino do histórico".
 
 ### 10. 🧱 O mínimo antes de divulgar
 
