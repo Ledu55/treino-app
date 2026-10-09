@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { recordKeys } from '../stats.js';
 import { deleteHistoryEntry, getState, updateHistoryEntry } from '../store.js';
 import { showToast } from './Toast.jsx';
 
@@ -96,7 +97,7 @@ function HistoryEntryEditor({ entry, onClose }) {
     );
 }
 
-function HistoryEntry({ entry }) {
+function HistoryEntry({ entry, records }) {
     const [editing, setEditing] = useState(false);
 
     function remove() {
@@ -118,7 +119,9 @@ function HistoryEntry({ entry }) {
                                 {entry.exercises.filter(hasData).map((ex) => (
                                     <tr>
                                         <td>
-                                            {ex.nome}<br />
+                                            {ex.nome}
+                                            {records.has(entry.id + '|' + ex.exerciseId) && <span class="entry-record" title="Recorde"> 🏆</span>}
+                                            <br />
                                             {ex.note && <span class="entry-note">{ex.note}</span>}
                                         </td>
                                         <td class="entry-weight"><WeightCell ex={ex} /></td>
@@ -141,6 +144,7 @@ function HistoryEntry({ entry }) {
 
 export function HistorySection() {
     const { history } = getState();
+    const records = recordKeys(history);
     return (
         <div class="history-section">
             <details>
@@ -148,7 +152,7 @@ export function HistorySection() {
                 <div id="history-list">
                     {history.length === 0
                         ? <p class="history-empty">Nenhum treino finalizado ainda. Ao terminar, toque em "Finalizar treino".</p>
-                        : history.map((entry) => <HistoryEntry key={entry.id} entry={entry} />)}
+                        : history.map((entry) => <HistoryEntry key={entry.id} entry={entry} records={records} />)}
                 </div>
             </details>
         </div>

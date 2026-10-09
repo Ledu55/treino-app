@@ -3,11 +3,13 @@ import {
     appTitle, countDone, finishWorkout, getActivePlan, getCurrentWorkout, getState, selectWorkout, setWorkoutNote,
     subscribe, workoutExercises
 } from '../store.js';
+import { recordMessage } from '../stats.js';
 import { CloudSection } from './CloudSection.jsx';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
 import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen } from './PlansScreen.jsx';
 import { PrivacyLink, PrivacyScreen } from './PrivacyScreen.jsx';
+import { ProgressLink, ProgressScreen } from './ProgressScreen.jsx';
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
@@ -53,8 +55,9 @@ function WorkoutScreen() {
     function finish() {
         if (done < exercises.length / 2
             && !confirm(`Só ${done} de ${exercises.length} exercícios concluídos. Finalizar mesmo assim?`)) return;
-        finishWorkout(workout);
-        showToast('Treino salvo no histórico 💪');
+        const records = finishWorkout(workout);
+        if (records.length > 0) showToast(recordMessage(records), 6000);
+        else showToast('Treino salvo no histórico 💪');
     }
 
     return (
@@ -99,6 +102,7 @@ function WorkoutScreen() {
                     <EmptyWorkout plan={plan} workout={workout} />
                 )}
 
+                <ProgressLink />
                 <HistorySection />
                 <CloudSection />
                 <PrivacyLink />
@@ -112,6 +116,7 @@ function Screen({ route }) {
     switch (route.name) {
         case 'plans': return <PlansScreen />;
         case 'privacy': return <PrivacyScreen />;
+        case 'progress': return <ProgressScreen />;
         case 'plan': return <PlanEditorScreen planId={route.planId} />;
         case 'workout': return <WorkoutEditorScreen planId={route.planId} workoutId={route.workoutId} />;
         case 'picker': return <PickerScreen planId={route.planId} workoutId={route.workoutId} />;

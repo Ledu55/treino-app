@@ -655,7 +655,10 @@ select {
     pointer-events: none;
     transition: opacity 0.25s, transform 0.25s;
     z-index: 1100;
-    white-space: nowrap;
+    /* Uma linha quando cabe; o aviso de recordes quebra em vez de sair da tela */
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    text-align: center;
 }
 
 #toast.show {
@@ -1059,3 +1062,129 @@ select.editor-select {
 .delete-error { color: var(--danger); font-weight: 600; }
 .plan-btn.danger-solid { background-color: var(--danger); border-color: var(--danger); color: white; }
 .plan-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- Gráficos e recordes ---------- */
+
+.progress-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.8rem;
+    width: 100%;
+    margin-bottom: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--card-bg);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.progress-link-week { font-weight: 700; }
+.progress-link-action { color: var(--primary-dark); font-weight: 600; }
+
+.history-entry-body .entry-record { font-weight: normal; }
+
+.progress-box {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.2rem 1rem 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.week-count { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 600; }
+
+.chart { width: 100%; }
+.chart svg { display: block; overflow: visible; touch-action: pan-y; outline: none; }
+.chart svg:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-tick { fill: var(--text-light); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-tick.current { fill: var(--text); font-weight: 700; }
+.chart-value { fill: var(--text); font-size: 12px; font-weight: 700; }
+.chart-bar { fill: var(--primary); }
+.chart-line { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-area { fill: var(--primary); opacity: 0.1; }
+.chart-dot { fill: var(--primary); stroke: var(--card-bg); stroke-width: 2; }
+.chart-crosshair { stroke: var(--text-light); stroke-width: 1; }
+
+.stat-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0.8rem 0;
+}
+
+.stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.55rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--bg);
+    min-width: 0;
+}
+
+.stat-label { font-size: 0.75rem; color: var(--text-light); }
+.stat-value { font-size: 1rem; overflow-wrap: anywhere; }
+.stat-detail { font-size: 0.72rem; color: var(--text-light); }
+
+.segmented { display: flex; gap: 0.4rem; }
+
+.seg-btn {
+    flex: 1;
+    padding: 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.seg-btn[aria-pressed="true"] { background-color: var(--primary); border-color: var(--primary); color: white; }
+
+.chart-note { margin: 0.45rem 0 0.6rem; font-size: 0.78rem; color: var(--text-light); }
+
+.chart-readout {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 0.6rem;
+    margin: 0 0 0.3rem;
+    font-size: 0.82rem;
+    color: var(--text-light);
+}
+
+.chart-readout strong { font-size: 1.05rem; color: var(--text); }
+
+.progress-table {
+    width: 100%;
+    margin: 0.8rem 0 0.4rem;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.progress-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-light);
+    padding: 0.3rem 0.2rem;
+}
+
+.progress-table td {
+    padding: 0.35rem 0.2rem;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.progress-table-workout { display: block; font-size: 0.72rem; color: var(--text-light); }

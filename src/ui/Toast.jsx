@@ -14,10 +14,10 @@ function update(changes) {
     listeners.forEach((listener) => listener());
 }
 
-export function showToast(message) {
+export function showToast(message, duration = 2500) {
     update({ message, show: true });
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => update({ show: false }), 2500);
+    hideTimer = setTimeout(() => update({ show: false }), duration);
 }
 
 export function Toast() {

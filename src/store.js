@@ -5,6 +5,7 @@ import { getLibraryExercise, resolveExercise } from './data/library.js';
 import { getTemplate } from './data/templates.js';
 import { reportError } from './monitoring.js';
 import { getSetValues } from './progression.js';
+import { findRecords } from './stats.js';
 import { sortHistory } from './sync.js';
 import { newId } from './util.js';
 
@@ -217,6 +218,7 @@ export function applyWeight(key, series, value) {
 
 // ---------- Histórico ----------
 
+// Devolve os recordes pessoais batidos neste treino (stats.js → findRecords)
 export function finishWorkout(workout) {
     const exercises = workoutExercises(workout);
     const session = state.sessions[workout.id];
@@ -248,6 +250,7 @@ export function finishWorkout(workout) {
         })
     };
 
+    const records = findRecords(state.history, entry);
     state.history.unshift(entry);
     saveHistory();
     markDirty('history', entry.id);
@@ -259,6 +262,7 @@ export function finishWorkout(workout) {
     delete state.sessions[workout.id];
     saveSessions();
     emit();
+    return records;
 }
 
 // Corrige um treino já finalizado: change(draft) pode mudar carga, reps, séries feitas e

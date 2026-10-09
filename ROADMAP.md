@@ -9,6 +9,7 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 - Dados no `localStorage` (formato v2): perfil, fichas, histórico sem limite, últimos valores digitados e treino em andamento.
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
+- Gráficos de carga e volume por exercício, aviso de recorde pessoal e frequência semanal.
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): perfil em `users/{uid}`, um documento por ficha e por treino finalizado, sincronizados por [src/cloud.js](src/cloud.js) (só o que mudou) e mesclados por [src/sync.js](src/sync.js).
 - Tela "Privacidade e seus dados": texto de privacidade, exportação (JSON e planilha) e exclusão da conta.
 - Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions.
@@ -195,9 +196,13 @@ Tudo fica na tela "Privacidade e seus dados" ([src/ui/PrivacyScreen.jsx](src/ui/
 
 ### 11. ✨ Gráficos e recordes pessoais
 
-- [ ] Gráfico de carga (e volume) ao longo do tempo por exercício.
-- [ ] Aviso de recorde pessoal ao finalizar um treino ("🏆 Novo recorde no Agachamento: 42,5 kg").
-- [ ] Frequência semanal ("3 treinos esta semana").
+Tela "Gráficos e recordes" ([src/ui/ProgressScreen.jsx](src/ui/ProgressScreen.jsx), `#progresso`), aberta pelo botão "📈 Gráficos e recordes" acima do histórico; os cálculos ficam em [src/stats.js](src/stats.js). Só contam as séries marcadas como feitas, porque as outras podem ter só a carga que veio preenchida do treino anterior.
+
+- [x] Gráfico de carga (e volume) ao longo do tempo por exercício: um ponto por treino com a maior carga (ou a soma de carga × reps), juntando os treinos da ficha em que o exercício aparece. Tocar ou arrastar no gráfico mostra o treino daquele ponto; abaixo, uma tabela com todos os treinos e os recordes. Desenhado em SVG, sem biblioteca nova. `ProgressView` recebe o histórico como parâmetro, para o modo personal (item 12) mostrar o do aluno.
+- [x] Aviso de recorde pessoal ao finalizar um treino ("🏆 Novo recorde: Agachamento (42,5 kg)"; "no Agachamento" não serviria para "na Remada"). Recorde é passar a maior carga já feita no exercício; a primeira vez e igualar a carga não contam. O recorde também fica marcado com 🏆 no histórico.
+- [x] Frequência semanal ("3 treinos esta semana", com a semana começando na segunda), no botão da tela do treino e num gráfico das últimas 8 semanas.
+
+**Pronto quando:** ao bater uma carga nova, ela aparece no aviso, no histórico e no gráfico. Testado em [tests/unit/stats.test.js](tests/unit/stats.test.js) e [tests/e2e/progress.spec.js](tests/e2e/progress.spec.js).
 
 ### 12. ✨ Modo personal
 
