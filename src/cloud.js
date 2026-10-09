@@ -13,6 +13,7 @@ import {
     getState, localSnapshot, markAllDirty, onDataChange, replaceData, saveCloudMeta
 } from './store.js';
 import { NewerSchemaError, SCHEMA_VERSION, migrate } from './migrations.js';
+import { reportError } from './monitoring.js';
 import { mergeData, stableStringify } from './sync.js';
 import { debounce } from './util.js';
 
@@ -47,6 +48,10 @@ export const FIREBASE_CONFIGS = {
 const EMULATOR_HOSTS = { auth: 'http://localhost:9099', firestore: ['localhost', 8080] };
 // Gravações por lote (o limite do Firestore é 500)
 const BATCH_SIZE = 400;
+// Coleções dentro de users/{uid}, apagadas ao excluir a conta (uma coleção nova precisa entrar aqui)
+const USER_COLLECTIONS = ['plans', 'sessions', 'state'];
+// O Firebase só exclui uma conta com login feito há menos de 5 minutos
+const RECENT_LOGIN_MS = 4 * 60 * 1000;
 
 // localhost usa o projeto de dev (ou o emulador, com ?emulator na URL ou sem projeto de dev);
 // só o endereço publicado usa a produção; qualquer outro endereço fica sem nuvem.
@@ -92,11 +97,20 @@ export function hasPendingChanges(meta) {
 
 // Estado mostrado na seção de backup (ui/CloudSection.jsx) e no primeiro acesso
 // newerData: o backup na nuvem é de uma versão mais nova do app (não é lido nem gravado)
-const cloud = { env: null, ready: false, loadFailed: false, user: null, syncing: false, error: false, newerData: false };
+// accountDeleted: a conta foi excluída em outro aparelho, e o backup parou neste
+const cloud = {
+    env: null, ready: false, loadFailed: false, user: null, syncing: false, error: false, newerData: false,
+    accountDeleted: false
+};
 let sdk = null;
 let auth = null;
 let db = null;
 let pending = false;
+// Excluindo a conta: nada mais é sincronizado
+let deleting = false;
+
+// O documento do usuário sumiu depois de já ter sido sincronizado: a conta foi excluída
+class AccountDeletedError extends Error {}
 const listeners = new Set();
 const scheduleSync = debounce(() => syncCloud(), 2000);
 
@@ -122,6 +136,8 @@ async function pull(uid, since) {
     const userRef = sdk.doc(db, 'users', uid);
     const rootSnap = await sdk.getDoc(userRef);
     const root = rootSnap.exists() ? rootSnap.data() : null;
+    // Toda sincronização grava o documento do usuário; se ele não existe mais, foi apagado de propósito
+    if (!root && since) throw new AccountDeletedError();
     if (remoteSchema(root) > SCHEMA_VERSION) throw new NewerSchemaError(remoteSchema(root));
 
     const changedSince = (name) => {
@@ -224,7 +240,7 @@ function applyCloudData(data) {
 }
 
 async function syncCloud() {
-    if (!cloud.user) return;
+    if (!cloud.user || deleting) return;
     if (cloud.syncing) { pending = true; return; }
     if (!navigator.onLine) { emit(); return; }
 
@@ -258,8 +274,18 @@ async function syncCloud() {
         if (err instanceof NewerSchemaError) {
             // Backup feito por uma versão mais nova do app: não mexe nele até este app atualizar
             cloud.newerData = true;
+        } else if (err instanceof AccountDeletedError) {
+            // Conta excluída em outro aparelho: sai da conta sem reenviar nada e sem apagar o que
+            // está no celular. Se a pessoa entrar de novo, o backup recomeça do zero.
+            meta.uid = null;
+            meta.pulledAt = null;
+            saveCloudMeta();
+            cloud.accountDeleted = true;
+            sdk.signOut(auth);
         } else {
             console.warn('Falha no backup:', err);
+            // Sem internet não é defeito do app
+            if (navigator.onLine && err.code !== 'unavailable') reportError(err, 'sync');
             cloud.error = true;
             setTimeout(() => { if (hasPendingChanges(getState().cloudMeta)) syncCloud(); }, 60000);
         }
@@ -306,6 +332,7 @@ async function connect() {
         cloud.user = user;
         cloud.error = false;
         cloud.newerData = false;
+        if (user) cloud.accountDeleted = false;
         emit();
         if (user) syncCloud();
     });
@@ -330,16 +357,77 @@ export function initCloud() {
 }
 
 // Devolve true se o login deu certo; false se a pessoa fechou o popup
-export async function cloudSignIn() {
+async function googlePopup(open) {
     try {
-        await sdk.signInWithPopup(auth, new sdk.GoogleAuthProvider());
+        await open(new sdk.GoogleAuthProvider());
         return true;
     } catch (err) {
         if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return false;
+        reportError(err, 'login');
         throw err;
     }
 }
 
+export function cloudSignIn() {
+    return googlePopup((provider) => sdk.signInWithPopup(auth, provider));
+}
+
 export function cloudSignOut() {
     return sdk.signOut(auth);
+}
+
+function whenIdle() {
+    return new Promise((resolve) => {
+        if (!cloud.syncing) return resolve();
+        const stop = subscribeCloud(() => {
+            if (!cloud.syncing) { stop(); resolve(); }
+        });
+    });
+}
+
+// Exclui a conta (LGPD): apaga todos os documentos da pessoa na nuvem e a conta do Firebase Auth.
+// Devolve false se a pessoa fechou o popup de confirmação do login (nada foi apagado). Os dados do
+// celular ficam para quem chama, depois que isto der certo.
+export async function deleteCloudAccount() {
+    deleting = true;
+    let cloudDataDeleted = false;
+    try {
+        await whenIdle();
+        const user = auth.currentUser;
+        const reauthenticate = () => googlePopup((provider) => sdk.reauthenticateWithPopup(user, provider));
+        // Login antigo: confirma antes de apagar qualquer coisa, para não ficar com os dados
+        // apagados e a conta não
+        if (Date.now() - Date.parse(user.metadata.lastSignInTime) > RECENT_LOGIN_MS && !(await reauthenticate())) {
+            deleting = false;
+            return false;
+        }
+
+        const userRef = sdk.doc(db, 'users', user.uid);
+        const refs = [];
+        for (const name of USER_COLLECTIONS) {
+            (await sdk.getDocs(sdk.collection(userRef, name))).forEach((snap) => refs.push(snap.ref));
+        }
+        // Por último: enquanto ele existe, os outros aparelhos continuam sincronizando
+        refs.push(userRef);
+        for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+            const batch = sdk.writeBatch(db);
+            refs.slice(i, i + BATCH_SIZE).forEach((ref) => batch.delete(ref));
+            await batch.commit();
+        }
+        cloudDataDeleted = true;
+
+        try {
+            await sdk.deleteUser(user);
+        } catch (err) {
+            if (err.code !== 'auth/requires-recent-login' || !(await reauthenticate())) throw err;
+            await sdk.deleteUser(user);
+        }
+        return true;
+    } catch (err) {
+        // Depois de apagar os dados da nuvem, não sincroniza mais (senão o celular os enviaria de
+        // novo); a pessoa pode tentar de novo para excluir a conta
+        if (!cloudDataDeleted) deleting = false;
+        reportError(err, 'delete-account');
+        throw err;
+    }
 }

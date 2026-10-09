@@ -21,7 +21,7 @@ npx playwright install chromium   # uma vez
 | `npm run test:unit` | Só os testes de unidade (não precisam do emulador) |
 | `npm run test:e2e` | Só os testes de ponta a ponta (o de nuvem é pulado sem o emulador) |
 
-O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `sync.js`, `cloud.js`, `timer.js`), biblioteca de exercícios e modelos de ficha em `src/data/` e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
+O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `sync.js`, `cloud.js`, `timer.js`, `export.js`, `monitoring.js`), biblioteca de exercícios e modelos de ficha em `src/data/` e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
 
 ### Qual Firebase o app usa
 
@@ -46,6 +46,24 @@ npm run deploy:rules:prod
 ```
 
 As regras precisam estar publicadas antes do app que depende delas: desde o formato v2 o backup grava em `users/{uid}/plans`, `sessions` e `state`, que as regras antigas negam (o app só mostra "Não foi possível salvar agora" e tenta de novo, sem perder nada).
+
+### Antes de divulgar: passos manuais
+
+Estes passos são feitos nos consoles do Google e do Sentry, fora do código (item 10 do [ROADMAP](ROADMAP.md)).
+
+**1. Restringir as chaves da API.** As chaves do Firebase ficam visíveis no app (é normal); a restrição impede que outro site as use. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), em cada projeto, abra a chave "Browser key (auto created by Firebase)" (a mesma `apiKey` de [src/cloud.js](src/cloud.js)):
+
+- Em "Restrições de aplicativo", escolha "Sites" e adicione:
+  - produção (`treino-app-21fcd`): `https://ledu55.github.io/*` e `https://treino-app-21fcd.firebaseapp.com/*`;
+  - dev (`treino-app-dev-306d2`): `http://localhost:8000/*` e `https://treino-app-dev-306d2.firebaseapp.com/*`.
+
+  O endereço `*.firebaseapp.com` é obrigatório: a janela do login Google roda nele e usa a mesma chave. Sem ele, o login para de funcionar.
+- Restrições de API: a chave criada pelo Firebase já vem limitada às APIs do Firebase. A lista aparece no alto da página da chave, acima de "Restrições de chave". Confira se ela tem Identity Toolkit API, Token Service API e Cloud Firestore API; não é preciso mexer.
+- Depois de salvar (leva alguns minutos para valer), confira no celular: entrar com Google, finalizar um treino e ver "Último backup" atualizar. O emulador e os testes usam uma chave falsa e não são afetados.
+
+**2. Alerta de orçamento.** No [Console do Firebase](https://console.firebase.google.com/project/treino-app-21fcd/usage/details), veja o plano. No Spark (gratuito) não há cobrança: passou da cota do dia, o backup para até o dia seguinte e o app continua funcionando no celular. Nesse caso não há o que configurar. No Blaze (pago por uso), crie um orçamento em Google Cloud Console → Faturamento → Orçamentos e alertas (ex.: R$ 10 por mês, com alertas em 50%, 90% e 100%).
+
+**3. Monitoramento de erros (Sentry).** Crie uma conta no [Sentry](https://sentry.io) (plano Developer, gratuito) e um projeto "Browser JavaScript". Copie o DSN (Settings → Projects → Client Keys) para `SENTRY_DSN` em [src/monitoring.js](src/monitoring.js). No projeto, ative "Prevent Storing of IP Addresses" (Security & Privacy) e, em Allowed Domains, deixe só `ledu55.github.io`. O monitoramento só liga na produção; quando ele liga, o texto de privacidade do app passa a citar o Sentry.
 
 ### Mudanças no formato dos dados
 

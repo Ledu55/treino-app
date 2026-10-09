@@ -3,7 +3,7 @@
 export { initializeApp } from 'firebase/app';
 export {
     getAuth, connectAuthEmulator, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut,
-    GoogleAuthProvider
+    reauthenticateWithPopup, deleteUser, GoogleAuthProvider
 } from 'firebase/auth';
 export {
     initializeFirestore, connectFirestoreEmulator, doc, collection, query, where, getDoc, getDocs, writeBatch,

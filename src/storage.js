@@ -98,6 +98,11 @@ export function restoreBackup() {
     return true;
 }
 
+// Apaga todos os dados do app neste celular, inclusive a cópia de antes da migração (excluir conta)
+export function clearLocalData() {
+    for (const key of Object.values(KEYS)) localStorage.removeItem(key);
+}
+
 function loadLocalData() {
     return {
         profile: storageGet(KEYS.profile, null),

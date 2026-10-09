@@ -194,6 +194,50 @@ test('backup da v1 na nuvem é migrado e guardado como cópia', async ({ page, r
     expect(sessions[0].workoutNote).toBe('do outro celular');
 });
 
+test('excluir conta apaga a nuvem, a conta e o celular; o outro aparelho para o backup', async ({ page, request }) => {
+    await page.goto(`${APP}?emulator`);
+    await expect(page.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    const uid = await signIn(page);
+    await page.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect.poll(async () => (await readCollection(request, `users/${uid}/sessions`)).length, { timeout: 15000 }).toBe(1);
+
+    // Outro celular com a mesma conta
+    const other = await otherPhone(page);
+    await other.goto(`${APP}?emulator`);
+    await expect(other.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    await signIn(other);
+    await expect(other.locator('#cloud-detail')).toContainText('Último backup');
+
+    await page.getByRole('button', { name: 'Privacidade e seus dados' }).click();
+    await expect(page.getByRole('heading', { name: 'Excluir conta' })).toBeVisible();
+    await expect(page.locator('#delete-data')).toContainText('ana@example.com');
+    await page.getByRole('button', { name: 'Excluir conta e dados' }).click();
+    await page.getByRole('button', { name: 'Sim, excluir tudo' }).click();
+    await expect(page.locator('#toast')).toHaveText('Conta excluída');
+    await expect(page.locator('#welcome-name')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
+
+    expect(await readDoc(request, `users/${uid}`)).toBeNull();
+    for (const name of ['plans', 'sessions', 'state']) {
+        expect(await readCollection(request, `users/${uid}/${name}`)).toEqual([]);
+    }
+
+    // O outro celular percebe na próxima sincronização: sai da conta, sem reenviar nada e sem
+    // apagar os treinos que estão nele
+    await other.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(other.locator('#cloud-detail')).toContainText('excluída em outro aparelho');
+    await expect(other.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    await other.getByText('Histórico de treinos').click();
+    await expect(other.locator('.history-entry')).toHaveCount(1);
+    await other.waitForTimeout(2500);
+    expect(await readDoc(request, `users/${uid}`)).toBeNull();
+    expect(await readCollection(request, `users/${uid}/sessions`)).toEqual([]);
+    await other.close();
+
+    // A conta não existe mais: entrar de novo com a mesma conta Google cria outra
+    expect(await createAccount(request)).not.toBe(uid);
+});
+
 test('backup de uma versão mais nova do app não é lido nem sobrescrito', async ({ page, request }) => {
     // Outro aparelho, com uma versão mais nova do app, gravou o backup num formato novo
     const uid = await createAccount(request);

@@ -6,6 +6,7 @@ import { cloudSignIn, getCloudState, subscribeCloud } from '../cloud.js';
 import { completeOnboarding, getState } from '../store.js';
 import { TemplateList } from './editor/PlanEditor.jsx';
 import { useSubscription } from './hooks.js';
+import { PrivacyLink } from './PrivacyScreen.jsx';
 import { navigate, planPath } from './router.js';
 import { showToast } from './Toast.jsx';
 
@@ -94,6 +95,7 @@ export function Welcome() {
                 </section>
 
                 <button type="button" class="finish-btn" onClick={start} disabled={syncing}>Começar</button>
+                <PrivacyLink />
                 <p class="app-version">Versão {__APP_VERSION__}</p>
             </div>
         </>

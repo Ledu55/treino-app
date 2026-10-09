@@ -10,6 +10,7 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 - Registro de carga e reps por série, histórico de treinos, timer de descanso.
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): perfil em `users/{uid}`, um documento por ficha e por treino finalizado, sincronizados por [src/cloud.js](src/cloud.js) (só o que mudou) e mesclados por [src/sync.js](src/sync.js).
+- Tela "Privacidade e seus dados": texto de privacidade, exportação (JSON e planilha) e exclusão da conta.
 - Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions.
 
 ## Princípios
@@ -180,14 +181,17 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 
 ### 10. 🧱 O mínimo antes de divulgar
 
-- [ ] **Excluir conta:** apagar todos os dados da nuvem e a conta do Firebase Auth (LGPD).
-- [ ] **Exportar dados:** baixar o histórico (LGPD: portabilidade).
-- [ ] Texto curto de privacidade dentro do app: quais dados são guardados, onde e para quê.
-- [ ] Restringir a chave da API (apiKey) no Google Cloud a `ledu55.github.io/*` e `localhost`.
-- [ ] Alerta de orçamento no Firebase/Google Cloud.
-- [ ] Monitoramento de erros (ex.: Sentry no plano gratuito), para saber quando algo falha no celular de outra pessoa.
+Tudo fica na tela "Privacidade e seus dados" ([src/ui/PrivacyScreen.jsx](src/ui/PrivacyScreen.jsx), `#privacidade`), com link no fim do treino, nas fichas e na tela de boas-vindas.
 
-**Pronto quando:** dá para indicar o app para alguém fora da família sem riscos legais ou de custo.
+- [x] **Excluir conta:** apagar todos os dados da nuvem e a conta do Firebase Auth (LGPD). `deleteCloudAccount` em [src/cloud.js](src/cloud.js) apaga `plans`, `sessions` e `state`, depois o documento do usuário e por fim a conta; se o login tiver mais de 4 minutos, pede o login de novo antes de apagar qualquer coisa (o Firebase só exclui contas com login recente). Em seguida apaga os dados do celular e volta à tela de boas-vindas. Sem login, o mesmo botão apaga só o celular. Outro aparelho com a mesma conta percebe na próxima sincronização (o documento do usuário sumiu depois de já ter sido sincronizado), sai da conta sem reenviar nada e mantém os treinos que estão nele.
+- [x] **Exportar dados:** baixar o histórico (LGPD: portabilidade). Tudo em JSON (perfil, fichas, histórico, últimos valores e treino em andamento) e o histórico em planilha CSV, uma linha por série ([src/export.js](src/export.js)).
+- [x] Texto curto de privacidade dentro do app: quais dados são guardados, onde e para quê.
+- [ ] Contato de quem responde pelos dados no texto de privacidade (a LGPD pede a identificação e o contato do controlador). Falta decidir qual contato publicar.
+- [x] Restringir a chave da API (apiKey) no Google Cloud a `ledu55.github.io/*` e `localhost`. Produção: sites `ledu55.github.io` e `treino-app-21fcd.firebaseapp.com`; dev: `localhost:8000` e `treino-app-dev-306d2.firebaseapp.com`. As APIs já vinham limitadas pelo Firebase, com a Cloud Firestore API incluída. Login e backup testados no celular (produção) e em `localhost` (dev) em 2026-10-09. Passo a passo no [README](README.md#antes-de-divulgar-passos-manuais).
+- [x] Alerta de orçamento no Firebase/Google Cloud. Não se aplica: o projeto está no plano Spark (gratuito, conferido em 2026-10-09), que não tem cobrança. Passada a cota do dia, o backup para até o dia seguinte e o app continua funcionando no celular. Se um dia mudar para o Blaze, criar o alerta antes (ver o [README](README.md#antes-de-divulgar-passos-manuais)).
+- [x] Monitoramento de erros (ex.: Sentry no plano gratuito), para saber quando algo falha no celular de outra pessoa. [src/monitoring.js](src/monitoring.js): só na produção, com o SDK carregado sob demanda (~32 KB gzip, num arquivo próprio), relatórios guardados no celular quando não há internet, sem IP, sem e-mail, sem registro de toques e requisições e sem contar aberturas do app. Além dos erros não tratados, envia as falhas de backup, login, migração, gravação no celular e exclusão de conta. Projeto no Sentry criado em 2026-10-09 (região US), com "Prevent Storing of IP Addresses" ligado e Allowed Domains só `ledu55.github.io`; o DSN está em `SENTRY_DSN`. Com ele, o texto de privacidade cita o Sentry.
+
+**Pronto quando:** dá para indicar o app para alguém fora da família sem riscos legais ou de custo. Testado em [tests/unit/export.test.js](tests/unit/export.test.js), [tests/e2e/privacy.spec.js](tests/e2e/privacy.spec.js) e no teste de ponta a ponta "excluir conta" (no emulador, com um segundo aparelho).
 
 ### 11. ✨ Gráficos e recordes pessoais
 
@@ -208,6 +212,7 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 - [ ] Aviso para o aluno: "Ficha atualizada pelo seu personal".
 - [ ] O aluno vê quem tem acesso e pode remover.
 - [ ] Testes das regras: personal autorizado, personal removido, personal sem vínculo e aluno tentando alterar a estrutura de uma ficha do personal.
+- [ ] Atualizar o texto de privacidade (quem mais vê os dados) e a exclusão de conta (convites e vínculos com o personal).
 
 ### 13. ✨ Refinamentos
 
@@ -234,6 +239,7 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
 | Timer com a tela desligada | Fora do escopo; manter a tela ligada com Wake Lock (item 13) |
 | Ordem das fases | A reestruturação (item 3) continua separada do novo modelo de dados (item 6), para os testes garantirem que nada mudou |
 | Armazenamento local | `localStorage`, com o `storage.js` isolado para trocar por IndexedDB se um dia precisar (item 6) |
+| Plano do Firebase | Spark (gratuito), sem risco de cobrança; mudar para o Blaze só com alerta de orçamento criado antes (item 10) |
 | Recusados | Iniciar o timer de descanso automaticamente; modo escuro |
 
 ## Decisões em aberto

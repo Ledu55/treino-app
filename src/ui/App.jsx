@@ -7,6 +7,7 @@ import { CloudSection } from './CloudSection.jsx';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
 import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen } from './PlansScreen.jsx';
+import { PrivacyLink, PrivacyScreen } from './PrivacyScreen.jsx';
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
@@ -100,6 +101,7 @@ function WorkoutScreen() {
 
                 <HistorySection />
                 <CloudSection />
+                <PrivacyLink />
                 <p class="app-version">Versão {__APP_VERSION__}</p>
             </div>
         </>
@@ -109,6 +111,7 @@ function WorkoutScreen() {
 function Screen({ route }) {
     switch (route.name) {
         case 'plans': return <PlansScreen />;
+        case 'privacy': return <PrivacyScreen />;
         case 'plan': return <PlanEditorScreen planId={route.planId} />;
         case 'workout': return <WorkoutEditorScreen planId={route.planId} workoutId={route.workoutId} />;
         case 'picker': return <PickerScreen planId={route.planId} workoutId={route.workoutId} />;
@@ -127,7 +130,7 @@ export function App() {
 
     return (
         <>
-            {getState().profile ? <Screen key={screenKey} route={route} /> : <Welcome />}
+            {getState().profile || route.name === 'privacy' ? <Screen key={screenKey} route={route} /> : <Welcome />}
             <UpdateBanner />
             <TimerBar />
             <Toast />

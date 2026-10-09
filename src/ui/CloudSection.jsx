@@ -24,7 +24,9 @@ function status(cloud, cloudMeta) {
         return {
             icon: '☁️',
             title: 'Backup desativado',
-            detail: 'Entre com sua conta Google para guardar seus treinos na nuvem. Assim nada se perde se trocar de celular.'
+            detail: cloud.accountDeleted
+                ? 'Sua conta foi excluída em outro aparelho, e o backup parou. Os treinos deste celular continuam aqui.'
+                : 'Entre com sua conta Google para guardar seus treinos na nuvem. Assim nada se perde se trocar de celular.'
         };
     }
     let text;
@@ -37,7 +39,7 @@ function status(cloud, cloudMeta) {
     return { icon: '✅', title: 'Backup ativo', detail: `${cloud.user.email || ''}\n${text}` };
 }
 
-async function signIn() {
+export async function signIn() {
     try {
         if (await cloudSignIn()) showToast('Backup ativado ☁️');
     } catch (err) {

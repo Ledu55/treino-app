@@ -3,6 +3,7 @@
 import { KEYS, prepareLocalData, storageSet } from './storage.js';
 import { getLibraryExercise, resolveExercise } from './data/library.js';
 import { getTemplate } from './data/templates.js';
+import { reportError } from './monitoring.js';
 import { getSetValues } from './progression.js';
 import { sortHistory } from './sync.js';
 import { newId } from './util.js';
@@ -22,6 +23,7 @@ export function initStore() {
         data = prepareLocalData();
     } catch (err) {
         console.error('Falha ao migrar os dados:', err);
+        reportError(err, 'migration');
         return 'error';
     }
     if (!data) return 'newer';

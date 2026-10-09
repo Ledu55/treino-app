@@ -52,6 +52,16 @@ describe('o aluno', () => {
         await assertSucceeds(deleteDoc(doc(db, 'users/ana/plans/p1')));
     });
 
+    it('lista e apaga todos os próprios documentos (excluir conta)', async () => {
+        const db = as('ana');
+        for (const name of ['plans', 'sessions', 'state']) {
+            await assertSucceeds(getDocs(collection(db, `users/ana/${name}`)));
+        }
+        for (const path of ['users/ana/plans/p1', 'users/ana/sessions/s1', 'users/ana/state/current', 'users/ana']) {
+            await assertSucceeds(deleteDoc(doc(db, path)));
+        }
+    });
+
     it('cria tudo na primeira sincronização', async () => {
         const db = as('carla');
         await assertSucceeds(setDoc(doc(db, 'users/carla'), { schema: 2 }));

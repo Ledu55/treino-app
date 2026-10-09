@@ -587,7 +587,7 @@ select {
 
 .cloud-signin-btn:active { transform: scale(0.98); }
 
-.cloud-signout-btn {
+.cloud-signout-btn, .link-btn {
     align-self: flex-start;
     padding: 0;
     background: none;
@@ -1028,3 +1028,34 @@ select.editor-select {
 .welcome-note { font-size: 0.88rem; color: var(--text-light); margin: 0 0 0.7rem; }
 .welcome-name { width: 100%; font-size: 1rem; }
 .welcome .finish-btn:disabled { opacity: 0.6; }
+
+/* ---------- Privacidade e dados ---------- */
+
+.privacy-link { margin: 0 0 0.6rem; text-align: center; }
+.welcome .privacy-link { margin-top: 1rem; }
+
+.privacy-text { font-size: 0.9rem; line-height: 1.5; }
+.privacy-text ul { margin: 0; padding-left: 1.2rem; }
+.privacy-text li { margin-bottom: 0.4rem; }
+.privacy-text p { margin: 0; }
+
+.privacy-box {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.2rem 1rem 0.9rem;
+    margin: 1.2rem 0;
+}
+
+.delete-confirm {
+    margin-top: 0.6rem;
+    padding: 0.7rem;
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    font-size: 0.88rem;
+}
+
+.delete-confirm p { margin: 0 0 0.6rem; }
+.delete-error { color: var(--danger); font-weight: 600; }
+.plan-btn.danger-solid { background-color: var(--danger); border-color: var(--danger); color: white; }
+.plan-btn:disabled { opacity: 0.6; cursor: default; }

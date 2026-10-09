@@ -28,6 +28,7 @@
     "workbox-window": "^7.4.1"
   },
   "dependencies": {
+    "@sentry/browser": "^11.6.0",
     "firebase": "^12.19.0",
     "preact": "^11.0.0"
   }

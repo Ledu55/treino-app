@@ -4,11 +4,13 @@
 //   #ficha/<id>                  editor da ficha (treinos)
 //   #ficha/<id>/<treino>         editor do treino (exercícios)
 //   #ficha/<id>/<treino>/adicionar   escolher exercício da biblioteca
+//   #privacidade                 privacidade, exportar dados e excluir conta
 import { useEffect, useState } from 'preact/hooks';
 
 export function parseRoute(hash) {
     const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
     if (parts[0] === 'fichas') return { name: 'plans' };
+    if (parts[0] === 'privacidade') return { name: 'privacy' };
     if (parts[0] === 'ficha' && parts[1]) {
         const [, planId, workoutId, extra] = parts;
         if (workoutId && extra === 'adicionar') return { name: 'picker', planId, workoutId };

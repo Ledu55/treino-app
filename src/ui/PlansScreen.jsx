@@ -5,6 +5,7 @@ import {
     listPlans, setActivePlan, updatePlan, updateProfile
 } from '../store.js';
 import { ExercisePicker, PlanEditor, TemplateList, TextInput, WorkoutEditor, newPlanExercise } from './editor/PlanEditor.jsx';
+import { PrivacyLink } from './PrivacyScreen.jsx';
 import { goBack, navigate, planPath } from './router.js';
 import { showToast } from './Toast.jsx';
 
@@ -102,6 +103,7 @@ export function PlansScreen() {
                 {plans.map((plan) => <PlanCard key={plan.id} plan={plan} active={active && active.id === plan.id} />)}
                 <NewPlan />
                 <ProfileSection />
+                <PrivacyLink />
             </div>
         </>
     );
