@@ -36,5 +36,7 @@ export default defineConfig({
             }
         })
     ],
-    server: { port: 8000 }
+    // Só a porta 8000: a chave da API do Firebase de dev só aceita localhost:8000. Sem strictPort,
+    // com a 8000 ocupada o Vite passaria para a 8001 em silêncio e o login com Google falharia.
+    server: { port: 8000, strictPort: true }
 });
