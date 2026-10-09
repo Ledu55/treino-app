@@ -14,6 +14,9 @@ import { goBack, navigate } from './router.js';
 // Aviso mostrado depois de recarregar o app (main.jsx)
 export const NOTICE_KEY = 'treino.notice';
 
+// Contato de quem responde pelos dados (LGPD); provisório, até haver um endereço mais formal
+const PRIVACY_CONTACT = 'empulse.impulse@gmail.com';
+
 // Link para esta tela, no fim do treino, nas fichas e no primeiro acesso
 export function PrivacyLink() {
     return (
@@ -59,6 +62,10 @@ function PrivacyText() {
             <p>
                 Você pode baixar seus dados e excluir sua conta a qualquer momento, nesta tela. Para só parar o backup, use
                 "Sair da conta" no fim da tela do treino.
+            </p>
+            <h2 class="editor-heading">Contato</h2>
+            <p>
+                Dúvidas ou pedidos sobre seus dados: <a href={`mailto:${PRIVACY_CONTACT}`} id="privacy-contact">{PRIVACY_CONTACT}</a>
             </p>
         </section>
     );

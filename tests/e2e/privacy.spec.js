@@ -85,6 +85,7 @@ test.describe('primeiro acesso', () => {
         await page.goto(APP);
         await openPrivacy(page);
         await expect(page.getByText('Neste celular')).toBeVisible();
+        await expect(page.locator('#privacy-contact')).toHaveAttribute('href', 'mailto:empulse.impulse@gmail.com');
         // Ainda não há dados para baixar nem apagar
         await expect(page.locator('#export-data')).toHaveCount(0);
         await expect(page.locator('#delete-data')).toHaveCount(0);
