@@ -35,6 +35,8 @@ Definido por `pickFirebaseEnv` em [src/cloud.js](src/cloud.js):
 
 Fora da produção, o título da seção de backup mostra o ambiente, ex.: "Backup ativo [emulator]".
 
+As chaves da API do Firebase só aceitam os endereços acima (`localhost` só na porta 8000). Se o app passar a rodar num endereço novo (outro domínio ou outra porta), inclua esse endereço nos sites permitidos da chave, no Google Cloud Console; senão o login para de funcionar.
+
 ### Regras do Firestore
 
 As regras ficam em [firestore.rules](firestore.rules) e são testadas no emulador. Para publicar:
@@ -47,23 +49,19 @@ npm run deploy:rules:prod
 
 As regras precisam estar publicadas antes do app que depende delas: desde o formato v2 o backup grava em `users/{uid}/plans`, `sessions` e `state`, que as regras antigas negam (o app só mostra "Não foi possível salvar agora" e tenta de novo, sem perder nada).
 
-### Antes de divulgar: passos manuais
+### Privacidade e dados (LGPD)
 
-Estes passos são feitos nos consoles do Google e do Sentry, fora do código (item 10 do [ROADMAP](ROADMAP.md)).
+A tela "Privacidade e seus dados" ([src/ui/PrivacyScreen.jsx](src/ui/PrivacyScreen.jsx), endereço `#privacidade`) tem o texto de privacidade, a exportação (tudo em JSON e o histórico em planilha CSV, por [src/export.js](src/export.js)) e a exclusão da conta (`deleteCloudAccount` em [src/cloud.js](src/cloud.js)). O link fica no fim da tela do treino, nas fichas e na tela de boas-vindas.
 
-**1. Restringir as chaves da API.** As chaves do Firebase ficam visíveis no app (é normal); a restrição impede que outro site as use. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), em cada projeto, abra a chave "Browser key (auto created by Firebase)" (a mesma `apiKey` de [src/cloud.js](src/cloud.js)):
+Ao mudar o que o app guarda ou para onde os dados vão:
 
-- Em "Restrições de aplicativo", escolha "Sites" e adicione:
-  - produção (`treino-app-21fcd`): `https://ledu55.github.io/*` e `https://treino-app-21fcd.firebaseapp.com/*`;
-  - dev (`treino-app-dev-306d2`): `http://localhost:8000/*` e `https://treino-app-dev-306d2.firebaseapp.com/*`.
+- atualize o texto de privacidade nessa tela;
+- uma coleção nova dentro de `users/{uid}` precisa entrar em `USER_COLLECTIONS` ([src/cloud.js](src/cloud.js)), senão a exclusão da conta deixa esses dados para trás;
+- o contato de quem responde pelos dados é `PRIVACY_CONTACT`, em [src/ui/PrivacyScreen.jsx](src/ui/PrivacyScreen.jsx). Hoje é provisório: `empulse.impulse@gmail.com`.
 
-  O endereço `*.firebaseapp.com` é obrigatório: a janela do login Google roda nele e usa a mesma chave. Sem ele, o login para de funcionar.
-- Restrições de API: a chave criada pelo Firebase já vem limitada às APIs do Firebase. A lista aparece no alto da página da chave, acima de "Restrições de chave". Confira se ela tem Identity Toolkit API, Token Service API e Cloud Firestore API; não é preciso mexer.
-- Depois de salvar (leva alguns minutos para valer), confira no celular: entrar com Google, finalizar um treino e ver "Último backup" atualizar. O emulador e os testes usam uma chave falsa e não são afetados.
+### Monitoramento de erros
 
-**2. Alerta de orçamento.** No [Console do Firebase](https://console.firebase.google.com/project/treino-app-21fcd/usage/details), veja o plano. No Spark (gratuito) não há cobrança: passou da cota do dia, o backup para até o dia seguinte e o app continua funcionando no celular. Nesse caso não há o que configurar. No Blaze (pago por uso), crie um orçamento em Google Cloud Console → Faturamento → Orçamentos e alertas (ex.: R$ 10 por mês, com alertas em 50%, 90% e 100%).
-
-**3. Monitoramento de erros (Sentry).** Crie uma conta no [Sentry](https://sentry.io) (plano Developer, gratuito) e um projeto "Browser JavaScript". Copie o DSN (Settings → Projects → Client Keys) para `SENTRY_DSN` em [src/monitoring.js](src/monitoring.js). No projeto, ative "Prevent Storing of IP Addresses" (Security & Privacy) e, em Allowed Domains, deixe só `ledu55.github.io`. O monitoramento só liga na produção; quando ele liga, o texto de privacidade do app passa a citar o Sentry.
+Os erros vão para o Sentry (`SENTRY_DSN` em [src/monitoring.js](src/monitoring.js)) só na produção (`ledu55.github.io`), então o desenvolvimento e os testes não enviam nada.
 
 ### Mudanças no formato dos dados
 
