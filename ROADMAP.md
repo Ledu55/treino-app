@@ -1,6 +1,6 @@
 # Roadmap — Meu Treino
 
-Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que várias pessoas usem, cada uma com fichas personalizadas, montadas por ela mesma ou por um personal.
+Plano de evolução do app: começou atendendo uma pessoa, e o objetivo é que várias pessoas usem, cada uma com fichas personalizadas, montadas por ela mesma ou por um personal. Com o item 12, as fases 1 a 4 estão prontas; falta o item 13 (refinamentos) e o último passo do item 5 (testar as migrações com dados reais anonimizados).
 
 ## Onde estamos
 
@@ -137,6 +137,8 @@ Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só bu
   - o aluno lê e escreve tudo que é dele;
   - um personal listado em `trainers` pode ler o perfil, ler o histórico e criar/editar fichas (com `updatedBy` = ele), mas não pode apagar fichas ou treinos, gravar treinos nem alterar o perfil;
   - só o próprio aluno grava a lista `trainers`.
+
+  No item 12 as regras ficaram mais restritas: o personal edita só as fichas que criou (`createdBy` = ele), o aluno não muda a estrutura dessas fichas enquanto o personal tiver acesso, e o personal pode tirar a si mesmo da lista `trainers` (e de `trainerNames`), sem mexer em mais nada.
 - [x] Migração dos dados atuais (`migrateV1toV2` em [src/migrations.js](src/migrations.js)): a ficha A/B/C/D vira a primeira ficha da usuária atual, e o histórico e os últimos valores passam para os novos ids. Testado contra uma cópia congelada do código da v1: a sugestão de carga e os valores dos campos saem iguais para todos os exercícios. No histórico, os treinos do formato antigo (uma carga por exercício) passam a mostrar uma linha por série, e o nome do treino aparece completo ("Treino A - Inferiores"). O backup v1 na nuvem é migrado na primeira sincronização e fica guardado em `previousPayload`.
 - [x] `lastSessionAt` no perfil, atualizado ao finalizar um treino, para a lista de alunos do personal (item 12) não precisar de uma consulta por aluno. O personal lista os alunos com `where('trainers.<uid>', '==', true)` em `users`.
 - [x] **Decisão: armazenamento local → `localStorage`** (opção 1). Um treino ocupa ~1 KB, então os ~5 MB dão para mais de 15 anos a 5 treinos por semana; se uma gravação falhar, o app avisa na tela. O teste da opção 3 (2026-10-07, no emulador) mostrou que ela quebra o princípio 1: sem internet o login anônimo falha, e o que é gravado antes do primeiro login some da vista e nunca é enviado; num segundo celular, vincular uma conta Google que já existe dá `credential-already-in-use` e os dados anônimos ficam presos. Ela também precisaria de armazenamento e mesclagem próprios, e o SDK (175 KB gzip) teria de carregar antes de mostrar o treino. As opções eram:
@@ -222,7 +224,7 @@ A lógica sem rede fica em [src/personal.js](src/personal.js), a parte online em
 - [x] Testes das regras ([tests/rules/](tests/rules/firestore.rules.test.js)): personal autorizado, personal removido, personal sem vínculo, aluno tentando alterar a estrutura de uma ficha do personal e convites. De ponta a ponta, no emulador ([tests/e2e/cloud.spec.js](tests/e2e/cloud.spec.js)): convite, ficha montada pelo personal, aviso, histórico do aluno e remoção do acesso, com dois celulares; e a exclusão da conta do personal.
 - [x] Texto de privacidade atualizado (quem vê os dados, nome do personal, códigos de convite). Excluir a conta apaga também os convites e tira o personal da lista dos alunos; as fichas que ele montou ficam com os alunos.
 
-**Pronto quando:** um personal monta a ficha de um aluno no celular dele, o aluno recebe o aviso e treina com ela, e o aluno pode tirar o acesso quando quiser. Passo manual: publicar as regras novas (`npm run deploy:rules:dev` e `npm run deploy:rules:prod`) antes de publicar o app.
+**Pronto quando:** um personal monta a ficha de um aluno no celular dele, o aluno recebe o aviso e treina com ela, e o aluno pode tirar o acesso quando quiser. Regras publicadas no dev e na produção e app publicado (commit `496cca4`, testes do GitHub Actions passando) em 2026-10-09.
 
 ### 13. ✨ Refinamentos
 

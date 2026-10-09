@@ -59,6 +59,18 @@ Ao mudar o que o app guarda ou para onde os dados vão:
 - uma coleção nova dentro de `users/{uid}` precisa entrar em `USER_COLLECTIONS` ([src/cloud.js](src/cloud.js)), senão a exclusão da conta deixa esses dados para trás; dados da pessoa fora de `users/{uid}` (como os convites do modo personal, em `invites`) precisam ser apagados à parte em `deleteCloudAccount`;
 - o contato de quem responde pelos dados é `PRIVACY_CONTACT`, em [src/ui/PrivacyScreen.jsx](src/ui/PrivacyScreen.jsx). Hoje é provisório: `empulse.impulse@gmail.com`.
 
+### Modo personal
+
+O aluno dá acesso a um personal digitando o código de convite que o personal gerou (Fichas → Personal, `#personal`); o personal vê os alunos, monta fichas e acompanha o histórico em `#alunos`. A lógica sem rede fica em [src/personal.js](src/personal.js), a parte online em [src/personal-cloud.js](src/personal-cloud.js) e as telas em [src/ui/PersonalScreen.jsx](src/ui/PersonalScreen.jsx) e [src/ui/TrainerScreens.jsx](src/ui/TrainerScreens.jsx). Quem pode o quê está em [firestore.rules](firestore.rules).
+
+Ao mexer no modo personal:
+
+- o vínculo (`trainers` e `trainerNames` no documento do aluno) é gravado direto na nuvem e vem sempre de lá na sincronização ([src/sync.js](src/sync.js)); o backup do celular nunca grava esses campos;
+- uma ficha com `createdBy` de um personal que ainda tem acesso é só leitura na estrutura para o aluno: o backup do aluno só envia o `deleted` dela ([src/cloud.js](src/cloud.js) → `push`), porque as regras recusariam o resto, e uma gravação recusada trava o lote inteiro;
+- os dados do aluno não ficam no celular do personal: são lidos e gravados no Firestore a cada vez, então essas telas precisam de internet.
+
+Os testes de ponta a ponta do modo personal ficam em [tests/e2e/cloud.spec.js](tests/e2e/cloud.spec.js), junto com os outros que usam o emulador: cada teste apaga os dados do emulador, então eles precisam rodar em sequência, no mesmo arquivo.
+
 ### Monitoramento de erros
 
 Os erros vão para o Sentry (`SENTRY_DSN` em [src/monitoring.js](src/monitoring.js)) só na produção (`ledu55.github.io`), então o desenvolvimento e os testes não enviam nada.
