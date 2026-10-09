@@ -12,6 +12,7 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 - Gráficos de carga e volume por exercício, aviso de recorde pessoal e frequência semanal.
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): perfil em `users/{uid}`, um documento por ficha e por treino finalizado, sincronizados por [src/cloud.js](src/cloud.js) (só o que mudou) e mesclados por [src/sync.js](src/sync.js).
 - Tela "Privacidade e seus dados": texto de privacidade, exportação (JSON e planilha) e exclusão da conta.
+- Modo personal: convite por código, lista de alunos, fichas montadas pelo personal (só leitura para o aluno) e histórico e gráficos do aluno.
 - Testes automáticos (Vitest, Playwright, regras no emulador) rodando no GitHub Actions.
 
 ## Princípios
@@ -117,15 +118,15 @@ Plano de evolução do app: hoje ele atende uma pessoa, e o objetivo é que vár
 **Firestore:**
 
 ```
-users/{uid}                    perfil: nome, titulo, activePlanId, lastSessionAt, profileUpdatedAt, schema,
-                               trainers: { trainerUid: true } (isTrainer entra no item 12)
+users/{uid}                    perfil: nome, titulo, activePlanId, lastSessionAt, profileUpdatedAt, schema, isTrainer,
+                               trainers: { trainerUid: true }, trainerNames: { trainerUid: nome } (item 12)
 users/{uid}/plans/{planId}     ficha: nome, treinos[{ id, nome, exercicios[{ exerciseId, nome?, series, reps, descanso, obs }] }],
                                createdBy, updatedBy, updatedAt, deleted?
 users/{uid}/sessions/{id}      treino finalizado: date, planId, workoutId, workoutNome, workoutNote, doneCount, totalCount,
                                exercises[{ exerciseId, nome, note, sets[{ weight, reps, done }], setsDone, setsTotal }],
                                updatedAt (apagado: só { deleted: true })
 users/{uid}/state/current      últimos valores digitados: values{ 'treino|exercício': { sets, note, updatedAt } }
-invites/{codigo}               convite de personal: trainerUid, expiresAt (item 12)
+invites/{codigo}               convite de personal: trainerUid, trainerNome, expiresAt, createdAt (item 12)
 ```
 
 Todo documento leva `syncedAt` (hora do servidor), e cada sincronização só busca o que mudou desde a anterior. Diferenças em relação ao plano: a ficha ativa fica no perfil (`activePlanId`) em vez de um campo `ativa` em cada ficha, para nunca haver duas ativas; a versão continua no campo `schema`, que o app antigo já lê; os nomes dos campos do treino seguem os que o código já usava.
@@ -208,16 +209,20 @@ Tela "Gráficos e recordes" ([src/ui/ProgressScreen.jsx](src/ui/ProgressScreen.j
 
 **Depende de:** 6 (regras e modelo), 7 (editor) e 11 (gráficos).
 
-- [ ] Ativar o perfil de personal numa conta.
-- [ ] O personal gera um código de convite com validade; o aluno digita o código e confirma o acesso.
-- [ ] Lista de alunos do personal, com o último treino de cada um (`lastSessionAt`).
-- [ ] Editar a ficha de um aluno com o mesmo editor do item 7.
-- [ ] Para o aluno, a ficha montada pelo personal é só leitura na estrutura (exercícios, séries, reps, descanso); cargas e reps continuam sendo registradas normalmente. Para mudar a estrutura, o aluno usa "Duplicar ficha" e a cópia passa a ser dele. Garantido pelas regras do Firestore via `createdBy`.
-- [ ] Ver o histórico e os gráficos do aluno.
-- [ ] Aviso para o aluno: "Ficha atualizada pelo seu personal".
-- [ ] O aluno vê quem tem acesso e pode remover.
-- [ ] Testes das regras: personal autorizado, personal removido, personal sem vínculo e aluno tentando alterar a estrutura de uma ficha do personal.
-- [ ] Atualizar o texto de privacidade (quem mais vê os dados) e a exclusão de conta (convites e vínculos com o personal).
+A lógica sem rede fica em [src/personal.js](src/personal.js), a parte online em [src/personal-cloud.js](src/personal-cloud.js) e as telas em [src/ui/PersonalScreen.jsx](src/ui/PersonalScreen.jsx) (aluno, `#personal`) e [src/ui/TrainerScreens.jsx](src/ui/TrainerScreens.jsx) (personal, `#alunos` e `#aluno/<uid>/...`). O modo personal precisa de login e de internet; o registro dos treinos continua funcionando sem os dois (princípio 1).
+
+- [x] Ativar o perfil de personal numa conta: Fichas → "Sou personal" → "Ativar o modo personal" (`isTrainer` no perfil, sincronizado como o resto). Quem é personal ganha o botão 👥 no topo do treino e continua usando o app para os próprios treinos.
+- [x] O personal gera um código de convite com validade (6 letras e números, sem 0/O e 1/I; vale 7 dias, serve para mais de um aluno e pode ser cancelado; os vencidos são apagados). O aluno digita o código em Fichas → Personal, vê o nome do personal e confirma; o vínculo (`trainers` e `trainerNames`) é gravado pelo aluno no próprio documento, direto na nuvem.
+- [x] Lista de alunos do personal, com o último treino de cada um (`lastSessionAt`).
+- [x] Editar a ficha de um aluno com o mesmo editor do item 7. O personal cria fichas (de um modelo, do zero ou copiando uma ficha do aluno) e edita só as que ele criou; as do aluno ele vê e pode copiar. As mudanças vão direto para a nuvem, com um aviso "Salvando…" enquanto o servidor não confirma. O personal não escolhe a ficha ativa nem apaga fichas: isso é do aluno.
+- [x] Para o aluno, a ficha montada pelo personal é só leitura na estrutura (tela "Ver", com "Duplicar ficha", e a cópia é dele); cargas e reps continuam sendo registradas normalmente. O aluno pode apagar a ficha. Garantido pelas regras do Firestore via `createdBy`, e o backup do aluno só envia o `deleted` dessas fichas. **Decisão:** quando o aluno remove o personal, as fichas que ele montou passam a ser do aluno (editáveis).
+- [x] Ver o histórico (sem editar) e os gráficos do aluno (`ProgressView` e `HistoryList` com o histórico dele).
+- [x] Aviso para o aluno: "Ficha atualizada pelo seu personal", no topo do treino, com "Usar esta ficha", "Ver ficha" e "OK". Fica guardado no celular (`treino.trainerNotice`) até ser fechado; não aparece na primeira sincronização de um celular novo.
+- [x] O aluno vê quem tem acesso e pode remover (Fichas → Personal). O personal também pode sair da lista de um aluno ("Remover aluno"): as regras só o deixam tirar a si mesmo.
+- [x] Testes das regras ([tests/rules/](tests/rules/firestore.rules.test.js)): personal autorizado, personal removido, personal sem vínculo, aluno tentando alterar a estrutura de uma ficha do personal e convites. De ponta a ponta, no emulador ([tests/e2e/cloud.spec.js](tests/e2e/cloud.spec.js)): convite, ficha montada pelo personal, aviso, histórico do aluno e remoção do acesso, com dois celulares; e a exclusão da conta do personal.
+- [x] Texto de privacidade atualizado (quem vê os dados, nome do personal, códigos de convite). Excluir a conta apaga também os convites e tira o personal da lista dos alunos; as fichas que ele montou ficam com os alunos.
+
+**Pronto quando:** um personal monta a ficha de um aluno no celular dele, o aluno recebe o aviso e treina com ela, e o aluno pode tirar o acesso quando quiser. Passo manual: publicar as regras novas (`npm run deploy:rules:dev` e `npm run deploy:rules:prod`) antes de publicar o app.
 
 ### 13. ✨ Refinamentos
 
@@ -240,7 +245,7 @@ Tela "Gráficos e recordes" ([src/ui/ProgressScreen.jsx](src/ui/ProgressScreen.j
 | Quem monta as fichas | Os dois: cada pessoa e, opcionalmente, um personal autorizado pelo aluno |
 | Build | Vite + `vite-plugin-pwa`, publicado no GitHub Pages pelo GitHub Actions (item 3) |
 | Interface | Preact (JSX + hooks); regras de cálculo em JS puro, fora dos componentes |
-| Ficha montada pelo personal | Só leitura na estrutura para o aluno, que registra cargas normalmente e pode duplicar a ficha para ter uma cópia própria |
+| Ficha montada pelo personal | Só leitura na estrutura para o aluno, que registra cargas normalmente, pode duplicar a ficha para ter uma cópia própria e pode apagá-la; se o aluno remove o personal, a ficha passa a ser do aluno. O personal edita só as fichas que criou (item 12) |
 | Timer com a tela desligada | Fora do escopo; manter a tela ligada com Wake Lock (item 13) |
 | Ordem das fases | A reestruturação (item 3) continua separada do novo modelo de dados (item 6), para os testes garantirem que nada mudou |
 | Armazenamento local | `localStorage`, com o `storage.js` isolado para trocar por IndexedDB se um dia precisar (item 6) |

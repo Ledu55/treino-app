@@ -5,7 +5,7 @@
 //   mesmo id nos dois lados, vence o editado por último (empate: o do celular);
 // - fichas e últimos valores de cada exercício: vence o editado por último (empate: o do celular);
 // - perfil: vence o editado por último; lastSessionAt fica com o mais recente, e a lista de
-//   personais (trainers) é sempre a da nuvem, que só o aluno grava.
+//   personais (trainers e trainerNames) é sempre a da nuvem, gravada direto lá (personal-cloud.js).
 
 function newer(local, remote) {
     if (!remote) return local;
@@ -33,7 +33,18 @@ function mergeProfile(local, remote) {
     if (!local || !remote) return local || remote || null;
     const result = { ...newer(local, remote), lastSessionAt: latest(local.lastSessionAt, remote.lastSessionAt) };
     if (remote.trainers) result.trainers = remote.trainers;
+    if (remote.trainerNames) result.trainerNames = remote.trainerNames;
     return result;
+}
+
+// Fichas que chegaram da nuvem gravadas pelo personal (updatedBy é outra pessoa) e mudaram neste
+// celular: para o aviso "Ficha atualizada pelo seu personal"
+export function trainerPlanUpdates(before = {}, remotePlans = {}, mergedPlans = {}, uid) {
+    return Object.keys(remotePlans).filter((id) => {
+        const plan = remotePlans[id];
+        return mergedPlans[id] === plan && !plan.deleted && plan.updatedBy && plan.updatedBy !== uid
+            && stableStringify(before[id]) !== stableStringify(plan);
+    });
 }
 
 export function mergeData(local, remote) {

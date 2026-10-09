@@ -1,9 +1,10 @@
 // Estado do app (dados locais + treino escolhido) e as ações que o alteram. JS puro: as telas
 // (src/ui) assinam as mudanças com subscribe(); a nuvem (cloud.js) é avisada por onDataChange.
 import { KEYS, prepareLocalData, storageSet } from './storage.js';
-import { getLibraryExercise, resolveExercise } from './data/library.js';
+import { findCustomExercises, resolveExercise } from './data/library.js';
 import { getTemplate } from './data/templates.js';
 import { reportError } from './monitoring.js';
+import { planTrainer } from './personal.js';
 import { getSetValues } from './progression.js';
 import { findRecords } from './stats.js';
 import { sortHistory } from './sync.js';
@@ -109,15 +110,12 @@ export function listPlans() {
 
 // Exercícios criados pela pessoa (fora da biblioteca), em qualquer ficha
 export function listCustomExercises() {
-    const found = new Map();
-    for (const plan of listPlans()) {
-        for (const workout of plan.treinos) {
-            for (const ex of workout.exercicios) {
-                if (ex.nome && !getLibraryExercise(ex.exerciseId)) found.set(ex.exerciseId, { exerciseId: ex.exerciseId, nome: ex.nome });
-            }
-        }
-    }
-    return Array.from(found.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return findCustomExercises(listPlans());
+}
+
+// Personal que montou a ficha e ainda tem acesso ({ uid, nome }): a estrutura é só leitura
+export function getPlanTrainer(plan) {
+    return planTrainer(plan, state.profile);
 }
 
 export function getActivePlan() {
@@ -309,6 +307,28 @@ export function updateProfile(changes) {
     emit();
 }
 
+// Personais com acesso, depois de gravados direto na nuvem (personal-cloud.js). Não conta como
+// edição do perfil: a lista vem sempre da nuvem (sync.js).
+export function setTrainerLinks(trainers, trainerNames) {
+    state.profile = { ...state.profile, trainers, trainerNames };
+    saveProfile();
+    emit();
+}
+
+// ---------- Aviso "Ficha atualizada pelo seu personal" ----------
+
+export function notifyTrainerPlans(planIds) {
+    state.trainerNotice = Array.from(new Set([...state.trainerNotice, ...planIds]));
+    storageSet(KEYS.trainerNotice, state.trainerNotice);
+    emit();
+}
+
+export function dismissTrainerNotice() {
+    state.trainerNotice = [];
+    storageSet(KEYS.trainerNotice, []);
+    emit();
+}
+
 // Título do app: o escolhido pela pessoa ou "Treino de <nome>"
 export function appTitle(profile = state && state.profile) {
     if (profile && profile.titulo) return profile.titulo;
@@ -328,24 +348,35 @@ function savePlan(plan) {
     markDirty('plans', plan.id);
 }
 
-// Ficha nova, a partir de um modelo ou em branco (com um treino vazio)
-export function createPlan({ templateId, nome } = {}) {
+// Ficha nova (ainda não gravada): cópia de `source`, a partir de um modelo ou em branco (com um
+// treino vazio). by: uid do personal que a monta para um aluno (personal-cloud.js), ou null.
+export function newPlan({ templateId, source, nome, by = null } = {}) {
     const template = templateId && getTemplate(templateId);
-    const plan = {
+    let treinos = [{ id: newId(), nome: 'Treino A', exercicios: [] }];
+    if (source) treinos = copyWorkouts(source.treinos);
+    else if (template) treinos = copyWorkouts(template.treinos);
+    return {
         id: newId(),
-        nome: nome || (template ? template.nome : 'Minha ficha'),
-        treinos: template ? copyWorkouts(template.treinos) : [{ id: newId(), nome: 'Treino A', exercicios: [] }],
-        createdBy: null,
-        updatedBy: null,
+        nome: nome || (source ? `${source.nome} (cópia)` : template ? template.nome : 'Minha ficha'),
+        treinos,
+        createdBy: by,
+        updatedBy: by,
         updatedAt: Date.now()
     };
+}
+
+// Ficha nova, a partir de um modelo ou em branco (com um treino vazio)
+export function createPlan({ templateId, nome } = {}) {
+    const plan = newPlan({ templateId, nome });
     savePlan(plan);
     emit();
     return plan.id;
 }
 
-// Altera uma cópia da ficha: change(draft) pode mudar nome, treinos e exercícios
+// Altera uma cópia da ficha: change(draft) pode mudar nome, treinos e exercícios. Numa ficha do
+// personal não faz nada (as telas a mostram só para leitura, e as regras do Firestore recusariam).
 export function updatePlan(planId, change) {
+    if (getPlanTrainer(state.plans[planId])) return;
     const draft = structuredClone(state.plans[planId]);
     change(draft);
     draft.updatedAt = Date.now();
@@ -353,17 +384,9 @@ export function updatePlan(planId, change) {
     emit();
 }
 
+// A cópia é sempre da pessoa, mesmo se a ficha foi montada pelo personal
 export function duplicatePlan(planId) {
-    const source = state.plans[planId];
-    const plan = {
-        ...structuredClone(source),
-        id: newId(),
-        nome: `${source.nome} (cópia)`,
-        treinos: copyWorkouts(source.treinos),
-        createdBy: null,
-        updatedBy: null,
-        updatedAt: Date.now()
-    };
+    const plan = newPlan({ source: state.plans[planId] });
     savePlan(plan);
     emit();
     return plan.id;

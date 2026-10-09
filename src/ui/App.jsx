@@ -1,15 +1,19 @@
 import { useEffect } from 'preact/hooks';
 import {
-    appTitle, countDone, finishWorkout, getActivePlan, getCurrentWorkout, getState, selectWorkout, setWorkoutNote,
-    subscribe, workoutExercises
+    appTitle, countDone, dismissTrainerNotice, finishWorkout, getActivePlan, getCurrentWorkout, getPlan,
+    getPlanTrainer, getState, selectWorkout, setWorkoutNote, subscribe, workoutExercises
 } from '../store.js';
 import { recordMessage } from '../stats.js';
 import { CloudSection } from './CloudSection.jsx';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
-import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen } from './PlansScreen.jsx';
+import { PersonalScreen } from './PersonalScreen.jsx';
+import { PickerScreen, PlanEditorScreen, PlansScreen, WorkoutEditorScreen, activatePlan } from './PlansScreen.jsx';
 import { PrivacyLink, PrivacyScreen } from './PrivacyScreen.jsx';
 import { ProgressLink, ProgressScreen } from './ProgressScreen.jsx';
+import {
+    StudentPickerScreen, StudentPlanScreen, StudentProgressScreen, StudentScreen, StudentWorkoutScreen, StudentsScreen
+} from './TrainerScreens.jsx';
 import { TimerBar } from './TimerBar.jsx';
 import { Toast, showToast } from './Toast.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
@@ -32,6 +36,9 @@ function EmptyWorkout({ plan, workout }) {
     } else if (!workout) {
         text = `A ficha "${plan.nome}" ainda não tem treinos.`;
         action = ['Editar ficha', planPath(plan.id)];
+    } else if (getPlanTrainer(plan)) {
+        text = `O "${workout.nome}" ainda não tem exercícios. Ele é montado pelo seu personal.`;
+        action = ['Ver ficha', planPath(plan.id)];
     } else {
         text = `O "${workout.nome}" ainda não tem exercícios.`;
         action = ['Adicionar exercícios', planPath(plan.id, workout.id)];
@@ -44,8 +51,42 @@ function EmptyWorkout({ plan, workout }) {
     );
 }
 
+// "Ficha atualizada pelo seu personal", até a pessoa fechar o aviso
+function TrainerNotice() {
+    const plans = getState().trainerNotice.map(getPlan).filter(Boolean);
+    if (plans.length === 0) return null;
+    const single = plans.length === 1 ? plans[0] : null;
+    const active = getActivePlan();
+
+    function open() {
+        dismissTrainerNotice();
+        navigate(single ? planPath(single.id) : '#fichas');
+    }
+
+    function use() {
+        dismissTrainerNotice();
+        activatePlan(single);
+    }
+
+    return (
+        <div class="trainer-notice" id="trainer-notice" role="status">
+            <p>
+                📋 <strong>{single ? 'Ficha atualizada pelo seu personal' : 'Fichas atualizadas pelo seu personal'}</strong>:{' '}
+                {plans.map((p) => p.nome).join(', ')}
+            </p>
+            <div class="plan-card-actions">
+                {single && (!active || active.id !== single.id) && (
+                    <button type="button" class="plan-btn primary" onClick={use}>Usar esta ficha</button>
+                )}
+                <button type="button" class="plan-btn" onClick={open}>{single ? 'Ver ficha' : 'Ver fichas'}</button>
+                <button type="button" class="plan-btn" onClick={dismissTrainerNotice}>OK</button>
+            </div>
+        </div>
+    );
+}
+
 function WorkoutScreen() {
-    const { sessions } = getState();
+    const { sessions, profile } = getState();
     const plan = getActivePlan();
     const workout = getCurrentWorkout();
     const exercises = workout ? workoutExercises(workout) : [];
@@ -63,6 +104,9 @@ function WorkoutScreen() {
     return (
         <>
             <header>
+                {profile.isTrainer && (
+                    <button type="button" class="header-btn left" aria-label="Alunos" title="Alunos" onClick={() => navigate('#alunos')}>👥</button>
+                )}
                 <button type="button" class="header-btn" aria-label="Fichas" title="Fichas" onClick={() => navigate('#fichas')}>📋</button>
                 <h1>{appTitle()}</h1>
                 {workout && (
@@ -84,6 +128,7 @@ function WorkoutScreen() {
             </header>
 
             <div class="container">
+                <TrainerNotice />
                 {exercises.length > 0 ? (
                     <>
                         <div id="workout-container">
@@ -120,6 +165,13 @@ function Screen({ route }) {
         case 'plan': return <PlanEditorScreen planId={route.planId} />;
         case 'workout': return <WorkoutEditorScreen planId={route.planId} workoutId={route.workoutId} />;
         case 'picker': return <PickerScreen planId={route.planId} workoutId={route.workoutId} />;
+        case 'personal': return <PersonalScreen />;
+        case 'students': return <StudentsScreen />;
+        case 'student': return <StudentScreen studentUid={route.studentUid} />;
+        case 'studentProgress': return <StudentProgressScreen studentUid={route.studentUid} />;
+        case 'student-plan': return <StudentPlanScreen {...route} />;
+        case 'student-workout': return <StudentWorkoutScreen {...route} />;
+        case 'student-picker': return <StudentPickerScreen {...route} />;
         default: return <WorkoutScreen />;
     }
 }

@@ -1,6 +1,6 @@
 // Componentes do editor de fichas. Não leem o store: recebem a ficha e onChange(change), que
-// altera um rascunho da ficha (store.js → updatePlan). Assim o modo personal (item 12) usa os
-// mesmos componentes para editar a ficha de um aluno.
+// altera um rascunho da ficha (store.js → updatePlan, ou personal-cloud.js → changeStudentPlan,
+// quando o personal edita a ficha de um aluno).
 import { useState } from 'preact/hooks';
 import { resolveExercise, searchLibrary } from '../../data/library.js';
 import { TEMPLATES } from '../../data/templates.js';
@@ -201,6 +201,35 @@ export function ExercisePicker({ workout, custom = [], onPick }) {
                     + Criar exercício "{query.trim()}"
                 </button>
             )}
+        </div>
+    );
+}
+
+// ---------- Ficha só para leitura ----------
+
+// Ficha do personal vista pelo aluno, ou ficha do aluno vista pelo personal
+export function PlanSummary({ plan }) {
+    return (
+        <div class="plan-summary">
+            {plan.treinos.length === 0 && <p class="editor-empty">Nenhum treino ainda.</p>}
+            {plan.treinos.map((workout) => (
+                <section class="editor-card" key={workout.id} data-workout={workout.nome}>
+                    <h3 class="plan-summary-title">{workout.nome}</h3>
+                    {workout.exercicios.length === 0 && <p class="editor-empty">Nenhum exercício ainda.</p>}
+                    <ul class="plan-summary-list">
+                        {workout.exercicios.map((planEx) => {
+                            const ex = resolveExercise(planEx);
+                            return (
+                                <li key={planEx.exerciseId}>
+                                    <strong>{ex.nome}</strong>
+                                    <span>{ex.series} séries de {ex.reps} · descanso {formatTime(ex.descanso)}</span>
+                                    {ex.obs && <span class="plan-summary-obs">{ex.obs}</span>}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </section>
+            ))}
         </div>
     );
 }

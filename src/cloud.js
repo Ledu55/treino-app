@@ -6,15 +6,17 @@
 //   users/{uid}/plans/{id}      fichas (deleted: true quando apagada)
 //   users/{uid}/sessions/{id}   treinos finalizados (só { deleted: true } quando apagado)
 //   users/{uid}/state/current   últimos valores digitados: { values: { 'treino|exercício': ... } }
+//   invites/{codigo}            convites do modo personal (personal-cloud.js)
 //
 // Cada documento leva syncedAt (hora do servidor), e cada sincronização só busca o que mudou desde
 // a anterior. A mesclagem fica em sync.js.
 import {
-    getState, localSnapshot, markAllDirty, onDataChange, replaceData, saveCloudMeta
+    getState, localSnapshot, markAllDirty, notifyTrainerPlans, onDataChange, replaceData, saveCloudMeta
 } from './store.js';
 import { NewerSchemaError, SCHEMA_VERSION, migrate } from './migrations.js';
 import { reportError } from './monitoring.js';
-import { mergeData, stableStringify } from './sync.js';
+import { planTrainer } from './personal.js';
+import { mergeData, stableStringify, trainerPlanUpdates } from './sync.js';
 import { debounce } from './util.js';
 
 // Um projeto Firebase por ambiente. O objeto firebaseConfig vem do Console do Firebase →
@@ -84,7 +86,9 @@ export function rootToProfile(root) {
         lastSessionAt: root.lastSessionAt || null,
         updatedAt: root.profileUpdatedAt
     };
+    if (root.isTrainer) profile.isTrainer = true;
     if (root.trainers) profile.trainers = root.trainers;
+    if (root.trainerNames) profile.trainerNames = root.trainerNames;
     return profile;
 }
 
@@ -116,6 +120,16 @@ const scheduleSync = debounce(() => syncCloud(), 2000);
 
 export function getCloudState() {
     return cloud;
+}
+
+// SDK e banco para as operações online do modo personal (personal-cloud.js); null sem login
+export function cloudApi() {
+    return cloud.ready && cloud.user && !deleting ? { sdk, db, uid: cloud.user.uid } : null;
+}
+
+// Sincroniza agora (depois de gravar algo direto na nuvem, como a lista de personais)
+export function syncNow() {
+    syncCloud();
 }
 
 export function subscribeCloud(listener) {
@@ -180,7 +194,12 @@ async function push(uid, dirty, root, legacy) {
     const writes = [];
 
     for (const id of Object.keys(dirty.plans || {})) {
-        if (plans[id]) writes.push([sdk.doc(userRef, 'plans', id), { ...plans[id], syncedAt }]);
+        const plan = plans[id];
+        if (!plan) continue;
+        const ref = sdk.doc(userRef, 'plans', id);
+        // Ficha do personal: o aluno só pode apagá-la (firestore.rules), então só isso é enviado
+        if (!planTrainer(plan, profile)) writes.push([ref, { ...plan, syncedAt }]);
+        else if (plan.deleted) writes.push([ref, { deleted: true, updatedAt: plan.updatedAt, syncedAt }, { merge: true }]);
     }
     const deleted = new Set(deletedIds);
     const byId = new Map(history.map((entry) => [entry.id, entry]));
@@ -203,6 +222,7 @@ async function push(uid, dirty, root, legacy) {
             titulo: profile.titulo,
             activePlanId: profile.activePlanId,
             lastSessionAt: profile.lastSessionAt,
+            isTrainer: !!profile.isTrainer,
             profileUpdatedAt: profile.updatedAt
         });
     }
@@ -257,9 +277,13 @@ async function syncCloud() {
             markAllDirty();
         }
         const { root, remote, legacy, pulledAt } = await pull(uid, meta.pulledAt);
-        let merged = mergeData(localSnapshot(), remote);
+        const local = localSnapshot();
+        let merged = mergeData(local, remote);
         if (legacy) merged = mergeData(merged, legacy);
+        // Na primeira sincronização (celular novo, outra conta) tudo é novidade: sem aviso
+        const fromTrainer = meta.pulledAt ? trainerPlanUpdates(local.plans, remote.plans, merged.plans, uid) : [];
         applyCloudData(merged);
+        if (fromTrainer.length) notifyTrainerPlans(fromTrainer);
         if (legacy) markAllDirty();
 
         const sent = structuredClone(meta.dirty || {});
@@ -403,15 +427,27 @@ export async function deleteCloudAccount() {
         }
 
         const userRef = sdk.doc(db, 'users', user.uid);
-        const refs = [];
+        // Modo personal: apaga os convites e sai da lista dos alunos (as fichas montadas para eles
+        // ficam com eles). Primeiro, enquanto a conta ainda existe.
+        const ops = [];
+        const [invites, students] = await Promise.all([
+            sdk.getDocs(sdk.query(sdk.collection(db, 'invites'), sdk.where('trainerUid', '==', user.uid))),
+            sdk.getDocs(sdk.query(sdk.collection(db, 'users'), sdk.where(`trainers.${user.uid}`, '==', true)))
+        ]);
+        invites.forEach((snap) => ops.push((batch) => batch.delete(snap.ref)));
+        students.forEach((snap) => {
+            if (snap.id === user.uid) return;
+            const unlink = { [`trainers.${user.uid}`]: sdk.deleteField(), [`trainerNames.${user.uid}`]: sdk.deleteField() };
+            ops.push((batch) => batch.update(snap.ref, unlink));
+        });
         for (const name of USER_COLLECTIONS) {
-            (await sdk.getDocs(sdk.collection(userRef, name))).forEach((snap) => refs.push(snap.ref));
+            (await sdk.getDocs(sdk.collection(userRef, name))).forEach((snap) => ops.push((batch) => batch.delete(snap.ref)));
         }
         // Por último: enquanto ele existe, os outros aparelhos continuam sincronizando
-        refs.push(userRef);
-        for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+        ops.push((batch) => batch.delete(userRef));
+        for (let i = 0; i < ops.length; i += BATCH_SIZE) {
             const batch = sdk.writeBatch(db);
-            refs.slice(i, i + BATCH_SIZE).forEach((ref) => batch.delete(ref));
+            ops.slice(i, i + BATCH_SIZE).forEach((op) => op(batch));
             await batch.commit();
         }
         cloudDataDeleted = true;

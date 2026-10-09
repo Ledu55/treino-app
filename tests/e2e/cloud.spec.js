@@ -34,6 +34,26 @@ function decodeFields(fields) {
     return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, decode(v)]));
 }
 
+// JS → formato da API REST (só os tipos usados nos testes)
+function encode(value) {
+    if (value === null) return { nullValue: null };
+    if (value instanceof Date) return { timestampValue: value.toISOString() };
+    if (typeof value === 'string') return { stringValue: value };
+    if (typeof value === 'boolean') return { booleanValue: value };
+    if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+    if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+    return { mapValue: { fields: encodeFields(value) } };
+}
+
+function encodeFields(data) {
+    return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, encode(v)]));
+}
+
+// Grava um documento sem passar pelas regras; devolve true se deu certo
+async function writeDoc(request, path, data) {
+    return (await request.patch(`${DOCS}/${path}`, { headers: OWNER, data: { fields: encodeFields(data) } })).ok();
+}
+
 async function readDoc(request, path) {
     const res = await request.get(`${DOCS}/${path}`, { headers: OWNER });
     return res.ok() ? decodeFields((await res.json()).fields || {}) : null;
@@ -256,4 +276,167 @@ test('backup de uma versão mais nova do app não é lido nem sobrescrito', asyn
     expect(await readDoc(request, `users/${uid}`)).toEqual({ formatoNovo: true, schema: 999 });
     expect(await readCollection(request, `users/${uid}/plans`)).toEqual([]);
     expect(await readCollection(request, `users/${uid}/sessions`)).toEqual([]);
+});
+
+// ---------- Modo personal (item 12) ----------
+
+const PAULO = { sub: 'e2e-paulo', email: 'paulo@example.com', email_verified: true };
+
+// Celular sem nenhum dado
+async function freshPhone(browser) {
+    const page = await browser.newPage();
+    page.on('dialog', (dialog) => dialog.accept());
+    return page;
+}
+
+// Primeiro acesso (nome e o modelo "Corpo inteiro A/B") e login; devolve o uid
+async function setUpPhone(page, nome, account) {
+    await page.goto(`${APP}?emulator`);
+    await page.locator('#welcome-name').fill(nome);
+    await page.getByRole('button', { name: 'Começar', exact: true }).click();
+    await expect(page.locator('#cloud-title')).toHaveText('Backup desativado [emulator]');
+    const uid = await signIn(page, account);
+    await expect(page.locator('#cloud-detail')).toContainText('Último backup');
+    return uid;
+}
+
+const back = (page) => page.getByRole('button', { name: '‹ Voltar' }).click();
+
+test('modo personal: convite, ficha montada pelo personal, histórico da aluna e remoção do acesso', async ({ browser, request }) => {
+    // Dois celulares e várias sincronizações
+    test.slow();
+    const trainer = await freshPhone(browser);
+    const student = await freshPhone(browser);
+    const pauloUid = await setUpPhone(trainer, 'Paulo', PAULO);
+    const anaUid = await setUpPhone(student, 'Ana', ANA);
+
+    // O personal ativa o modo personal e gera um código
+    await trainer.getByRole('button', { name: 'Fichas', exact: true }).click();
+    await trainer.getByRole('button', { name: 'Sou personal' }).click();
+    await trainer.getByRole('button', { name: 'Ativar o modo personal' }).click();
+    await trainer.getByRole('button', { name: 'Gerar código de convite' }).click();
+    const code = (await trainer.locator('.invite-code').textContent()).trim();
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    await expect(trainer.locator('#students')).toContainText('Nenhum aluno ainda');
+    await expect.poll(async () => (await readDoc(request, `users/${pauloUid}`)).isTrainer, { timeout: 15000 }).toBe(true);
+
+    // A aluna digita o código (como ditado: minúsculas, com espaço) e confirma
+    await student.getByRole('button', { name: 'Fichas', exact: true }).click();
+    await student.getByRole('button', { name: 'Tenho um código de personal' }).click();
+    await student.getByLabel('Código do personal').fill('XXXXXX');
+    await student.getByRole('button', { name: 'Continuar' }).click();
+    await expect(student.locator('#invite')).toContainText('Código não encontrado ou vencido');
+    await student.getByLabel('Código do personal').fill(`${code.slice(0, 3)} ${code.slice(3)}`.toLowerCase());
+    await student.getByRole('button', { name: 'Continuar' }).click();
+    await expect(student.locator('.invite-confirm')).toContainText('Dar acesso a Paulo?');
+    await student.getByRole('button', { name: 'Dar acesso' }).click();
+    await expect(student.locator('.person-item[data-trainer="Paulo"]')).toBeVisible();
+    expect(await readDoc(request, `users/${anaUid}`)).toMatchObject({ trainers: { [pauloUid]: true }, trainerNames: { [pauloUid]: 'Paulo' } });
+
+    // O personal vê a aluna e monta uma ficha para ela
+    await back(trainer);
+    await trainer.getByRole('button', { name: '👥 Meus alunos' }).click();
+    await expect(trainer.locator('.student-item[data-student="Ana"]')).toContainText('Nenhum treino ainda');
+    await trainer.locator('.student-item[data-student="Ana"]').click();
+    await expect(trainer.locator('h1')).toHaveText('Ana');
+    await expect(trainer.locator('.plan-card[data-plan="Corpo inteiro A/B"]')).toContainText('Montada pelo aluno');
+    await trainer.getByRole('button', { name: '+ Nova ficha para o aluno' }).click();
+    await trainer.getByRole('button', { name: /Montar do zero/ }).click();
+    await trainer.locator('#plan-name').fill('Ficha do Paulo');
+    await trainer.locator('.editor-item-main', { hasText: 'Treino A' }).click();
+    await trainer.getByRole('button', { name: '+ Adicionar exercício' }).click();
+    await trainer.getByLabel('Buscar exercício').fill('agachamento livre');
+    await trainer.locator('.picker-item', { hasText: 'Agachamento Livre com Barra' }).click();
+    await trainer.locator('.editor-card[data-exercise="Agachamento Livre com Barra"]').getByLabel('Séries').selectOption('4');
+    await expect.poll(async () => (await readCollection(request, `users/${anaUid}/plans`)).find((p) => p.nome === 'Ficha do Paulo'), { timeout: 15000 })
+        .toMatchObject({
+            createdBy: pauloUid, updatedBy: pauloUid,
+            treinos: [{ nome: 'Treino A', exercicios: [{ exerciseId: 'agachamento-livre', series: 4 }] }]
+        });
+
+    // A aluna recebe o aviso e passa a usar a ficha
+    await back(student);
+    await back(student);
+    await student.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    const notice = student.locator('#trainer-notice');
+    await expect(notice).toContainText('Ficha atualizada pelo seu personal: Ficha do Paulo');
+    await notice.getByRole('button', { name: 'Usar esta ficha' }).click();
+    await expect(notice).toHaveCount(0);
+    const card = exerciseCard(student, 'Agachamento Livre com Barra');
+    await doSets(card, [[60, 8], [60, 8], [60, 8], [60, 8]]);
+    await expect.poll(() => student.evaluate(() => Object.values(JSON.parse(localStorage.getItem('treino.lastValues') || '{}'))
+        .some((v) => v.sets && v.sets.length === 4 && v.sets[3].reps === '8'))).toBe(true);
+    await student.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect.poll(async () => (await readCollection(request, `users/${anaUid}/sessions`)).length, { timeout: 15000 }).toBe(1);
+
+    // Para ela, a ficha do personal é só leitura
+    await student.getByRole('button', { name: 'Fichas', exact: true }).click();
+    const trainerPlan = student.locator('.plan-card[data-plan="Ficha do Paulo"]');
+    await expect(trainerPlan).toContainText('Montada por Paulo');
+    await trainerPlan.getByRole('button', { name: 'Ver' }).click();
+    await expect(student.locator('.trainer-plan-note')).toContainText('Paulo');
+    await expect(student.locator('.plan-summary')).toContainText('4 séries de 10 a 12 repetições');
+    await expect(student.locator('#plan-name')).toHaveCount(0);
+
+    // O personal vê o histórico e os gráficos da aluna, sem editar
+    await back(trainer);
+    await back(trainer);
+    await expect(trainer.locator('h1')).toHaveText('Ana');
+    await expect(trainer.locator('.progress-link')).toContainText('Último treino: hoje');
+    await trainer.getByRole('button', { name: /Histórico e gráficos/ }).click();
+    await expect(trainer.locator('h1')).toHaveText('Treinos de Ana');
+    await expect(trainer.locator('#weekly')).toContainText('1 treino esta semana');
+    await expect(trainer.locator('#exercise-progress')).toContainText('60 kg');
+    await trainer.locator('.history-entry summary').click();
+    await expect(trainer.locator('.history-entry')).toContainText('Agachamento Livre com Barra');
+    await expect(trainer.getByRole('button', { name: /Editar|Apagar/ })).toHaveCount(0);
+
+    // A aluna remove o acesso: a ficha passa a ser dela, e o personal não a vê mais
+    await back(student);
+    await student.getByRole('button', { name: 'Ver quem tem acesso' }).click();
+    await student.locator('.person-item[data-trainer="Paulo"]').getByRole('button', { name: 'Remover acesso' }).click();
+    await expect(student.locator('#toast')).toHaveText('Acesso removido');
+    await expect(student.locator('#trainers')).toContainText('Nenhum personal tem acesso');
+    expect((await readDoc(request, `users/${anaUid}`)).trainers || {}).toEqual({});
+    await back(student);
+    await expect(trainerPlan.getByRole('button', { name: 'Editar' })).toBeVisible();
+    await back(student);
+    await expect(student.locator('#cloud-detail')).toContainText('Último backup');
+
+    await back(trainer);
+    await back(trainer);
+    await expect(trainer.locator('#students')).toContainText('Nenhum aluno ainda');
+    await trainer.close();
+    await student.close();
+});
+
+test('personal que exclui a conta sai da lista dos alunos e apaga os convites', async ({ browser, request }) => {
+    const anaUid = await createAccount(request, ANA);
+    const pauloUid = await createAccount(request, PAULO);
+    expect(await writeDoc(request, `users/${anaUid}`, {
+        nome: 'Ana', schema: 2, profileUpdatedAt: 1, trainers: { [pauloUid]: true }, trainerNames: { [pauloUid]: 'Paulo' }
+    })).toBe(true);
+    expect(await writeDoc(request, `users/${anaUid}/plans/pp`, {
+        nome: 'Do Paulo', treinos: [], createdBy: pauloUid, updatedBy: pauloUid, updatedAt: 1
+    })).toBe(true);
+    expect(await writeDoc(request, 'invites/ABCDEF', {
+        trainerUid: pauloUid, trainerNome: 'Paulo', expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    })).toBe(true);
+
+    const trainer = await freshPhone(browser);
+    await setUpPhone(trainer, 'Paulo', PAULO);
+    await trainer.getByRole('button', { name: 'Privacidade e seus dados' }).click();
+    await trainer.getByRole('button', { name: 'Excluir conta e dados' }).click();
+    await trainer.getByRole('button', { name: 'Sim, excluir tudo' }).click();
+    await expect(trainer.locator('#toast')).toHaveText('Conta excluída');
+
+    // A aluna continua com os dados dela, inclusive a ficha que o personal montou
+    const ana = await readDoc(request, `users/${anaUid}`);
+    expect(ana).toMatchObject({ nome: 'Ana' });
+    expect(ana.trainers || {}).toEqual({});
+    expect(ana.trainerNames || {}).toEqual({});
+    expect((await readCollection(request, `users/${anaUid}/plans`)).map((p) => p.id)).toEqual(['pp']);
+    expect(await readCollection(request, 'invites')).toEqual([]);
+    expect(await readDoc(request, `users/${pauloUid}`)).toBeNull();
+    await trainer.close();
 });

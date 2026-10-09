@@ -21,7 +21,7 @@ npx playwright install chromium   # uma vez
 | `npm run test:unit` | Só os testes de unidade (não precisam do emulador) |
 | `npm run test:e2e` | Só os testes de ponta a ponta (o de nuvem é pulado sem o emulador) |
 
-O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `sync.js`, `cloud.js`, `timer.js`, `export.js`, `monitoring.js`), biblioteca de exercícios e modelos de ficha em `src/data/` e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
+O app fica em [src/](src/): lógica em JS puro (`storage.js`, `store.js`, `progression.js`, `sync.js`, `cloud.js`, `timer.js`, `export.js`, `monitoring.js`, `personal.js`, `personal-cloud.js`), biblioteca de exercícios e modelos de ficha em `src/data/` e telas em Preact (`src/ui/`). Arquivos estáticos (GIFs, ícones, manifest e `meu_treino_app.html`, que redireciona o endereço antigo) ficam em [public/](public/) e são copiados sem alteração para o build. O service worker sai de [src/sw.js](src/sw.js) com a lista de arquivos do build (`vite-plugin-pwa`), então não há versão de cache para atualizar à mão: quando sai uma versão nova, o app mostra "Nova versão disponível — Atualizar". A versão (data + commit) aparece no rodapé do app. A publicação no GitHub Pages é feita pelo GitHub Actions depois que os testes passam no `main`.
 
 ### Qual Firebase o app usa
 
@@ -47,7 +47,7 @@ npm run deploy:rules:dev    # primeiro no projeto de dev
 npm run deploy:rules:prod
 ```
 
-As regras precisam estar publicadas antes do app que depende delas: desde o formato v2 o backup grava em `users/{uid}/plans`, `sessions` e `state`, que as regras antigas negam (o app só mostra "Não foi possível salvar agora" e tenta de novo, sem perder nada).
+As regras precisam estar publicadas antes do app que depende delas (o modo personal, por exemplo, precisa da coleção `invites` e das regras de fichas do personal): desde o formato v2 o backup grava em `users/{uid}/plans`, `sessions` e `state`, que as regras antigas negam (o app só mostra "Não foi possível salvar agora" e tenta de novo, sem perder nada).
 
 ### Privacidade e dados (LGPD)
 
@@ -56,7 +56,7 @@ A tela "Privacidade e seus dados" ([src/ui/PrivacyScreen.jsx](src/ui/PrivacyScre
 Ao mudar o que o app guarda ou para onde os dados vão:
 
 - atualize o texto de privacidade nessa tela;
-- uma coleção nova dentro de `users/{uid}` precisa entrar em `USER_COLLECTIONS` ([src/cloud.js](src/cloud.js)), senão a exclusão da conta deixa esses dados para trás;
+- uma coleção nova dentro de `users/{uid}` precisa entrar em `USER_COLLECTIONS` ([src/cloud.js](src/cloud.js)), senão a exclusão da conta deixa esses dados para trás; dados da pessoa fora de `users/{uid}` (como os convites do modo personal, em `invites`) precisam ser apagados à parte em `deleteCloudAccount`;
 - o contato de quem responde pelos dados é `PRIVACY_CONTACT`, em [src/ui/PrivacyScreen.jsx](src/ui/PrivacyScreen.jsx). Hoje é provisório: `empulse.impulse@gmail.com`.
 
 ### Monitoramento de erros

@@ -27,6 +27,19 @@ export function searchLibrary(query) {
         .sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+// Exercícios criados pela pessoa (fora da biblioteca) nas fichas dadas: [{ exerciseId, nome }]
+export function findCustomExercises(plans) {
+    const found = new Map();
+    for (const plan of plans) {
+        for (const workout of plan.treinos) {
+            for (const ex of workout.exercicios) {
+                if (ex.nome && !getLibraryExercise(ex.exerciseId)) found.set(ex.exerciseId, { exerciseId: ex.exerciseId, nome: ex.nome });
+            }
+        }
+    }
+    return Array.from(found.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 // Exercício de uma ficha com os dados da biblioteca: { exerciseId, nome, grupo, img, instrucoes,
 // incremento, series, reps, descanso, obs }
 export function resolveExercise(planEx) {

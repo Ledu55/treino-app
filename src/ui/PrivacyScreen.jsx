@@ -5,9 +5,11 @@ import { deleteCloudAccount, getCloudState, subscribeCloud } from '../cloud.js';
 import { exportData, historyToCsv } from '../export.js';
 import { monitoringEnabled } from '../monitoring.js';
 import { clearLocalData } from '../storage.js';
+import { linkedTrainers } from '../personal.js';
 import { getState, listPlans } from '../store.js';
 import { signIn } from './CloudSection.jsx';
 import { useSubscription } from './hooks.js';
+import { ACCESS_TEXT } from './PersonalScreen.jsx';
 import { ScreenHeader } from './PlansScreen.jsx';
 import { goBack, navigate } from './router.js';
 
@@ -35,6 +37,11 @@ function PrivacyText() {
                 <li>Suas fichas e os treinos que você finaliza: exercícios, cargas, repetições e observações.</li>
                 <li>Os últimos valores digitados em cada exercício e o treino em andamento.</li>
                 <li>Se você entrar com Google: o nome, o e-mail e a foto da sua conta Google, usados só para o login.</li>
+                <li>Se você der acesso a um personal: o nome do personal, para mostrar quem tem acesso.</li>
+                <li>
+                    Se você usar o modo personal: os códigos de convite que você gera, com seu nome, até vencerem ou serem
+                    cancelados. Os alunos que usarem o código veem seu nome.
+                </li>
             </ul>
             <h2 class="editor-heading">Onde ficam</h2>
             <ul>
@@ -53,15 +60,21 @@ function PrivacyText() {
                     </li>
                 )}
             </ul>
+            <h2 class="editor-heading">Quem vê seus dados</h2>
+            <p>
+                Só você, a não ser que dê acesso a um personal digitando o código dele em Fichas → Personal (e confirmando).
+                O personal com acesso {ACCESS_TEXT}. Os últimos valores digitados e o treino em andamento ficam só com você.
+                Na mesma tela você vê quem tem acesso e pode remover a qualquer momento.
+            </p>
             <h2 class="editor-heading">Para quê</h2>
             <p>
-                Só para mostrar seus treinos, sugerir a carga do próximo e guardar o backup. Não há anúncios, e seus dados
-                não são vendidos nem compartilhados com ninguém.
+                Só para mostrar seus treinos, sugerir a carga do próximo, guardar o backup e, se você quiser, mostrar seus
+                treinos ao seu personal. Não há anúncios, e seus dados não são vendidos nem compartilhados com mais ninguém.
             </p>
             <h2 class="editor-heading">Seus direitos</h2>
             <p>
-                Você pode baixar seus dados e excluir sua conta a qualquer momento, nesta tela. Para só parar o backup, use
-                "Sair da conta" no fim da tela do treino.
+                Você pode baixar seus dados, tirar o acesso do personal e excluir sua conta a qualquer momento. Para só parar o
+                backup, use "Sair da conta" no fim da tela do treino.
             </p>
             <h2 class="editor-heading">Contato</h2>
             <p>
@@ -176,6 +189,10 @@ function DeleteSection() {
                         {plural(history.length, 'treino', 'treinos')} do histórico. Para guardar uma cópia, baixe seus dados antes.
                     </p>
                     {signedIn && <p>Se você usa o app em outro celular, os treinos que estão lá continuam lá.</p>}
+                    {signedIn && linkedTrainers(profile).length > 0 && <p>Seu personal perde o acesso.</p>}
+                    {signedIn && profile && profile.isTrainer && (
+                        <p>Seus códigos de convite são apagados e você sai da lista dos seus alunos. As fichas que você montou para eles continuam com eles.</p>
+                    )}
                     {offline && <p class="delete-error">Conecte-se à internet para excluir a conta.</p>}
                     {error && <p class="delete-error">{error}</p>}
                     <div class="plan-card-actions">

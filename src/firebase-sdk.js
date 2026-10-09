@@ -7,5 +7,5 @@ export {
 } from 'firebase/auth';
 export {
     initializeFirestore, connectFirestoreEmulator, doc, collection, query, where, getDoc, getDocs, writeBatch,
-    serverTimestamp, deleteField, Timestamp
+    setDoc, updateDoc, deleteDoc, serverTimestamp, deleteField, Timestamp
 } from 'firebase/firestore';

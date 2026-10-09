@@ -6,24 +6,49 @@
 //   #ficha/<id>/<treino>/adicionar   escolher exercício da biblioteca
 //   #privacidade                 privacidade, exportar dados e excluir conta
 //   #progresso                   gráficos, recordes e frequência semanal
+//   #personal                    aluno: quem tem acesso aos dados e código de convite
+//   #alunos                      modo personal: convites e lista de alunos
+//   #aluno/<uid>                 um aluno: fichas e "Remover aluno"
+//   #aluno/<uid>/progresso       histórico e gráficos do aluno
+//   #aluno/<uid>/ficha/<id>[/<treino>[/adicionar]]   fichas do aluno, como em #ficha
 import { useEffect, useState } from 'preact/hooks';
+
+// Editor de ficha a partir de [id, treino, extra]
+function planRoute(prefix, [planId, workoutId, extra], fields) {
+    if (workoutId && extra === 'adicionar') return { name: prefix + 'picker', planId, workoutId, ...fields };
+    if (workoutId) return { name: prefix + 'workout', planId, workoutId, ...fields };
+    return { name: prefix + 'plan', planId, ...fields };
+}
 
 export function parseRoute(hash) {
     const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
     if (parts[0] === 'fichas') return { name: 'plans' };
     if (parts[0] === 'privacidade') return { name: 'privacy' };
     if (parts[0] === 'progresso') return { name: 'progress' };
-    if (parts[0] === 'ficha' && parts[1]) {
-        const [, planId, workoutId, extra] = parts;
-        if (workoutId && extra === 'adicionar') return { name: 'picker', planId, workoutId };
-        if (workoutId) return { name: 'workout', planId, workoutId };
-        return { name: 'plan', planId };
+    if (parts[0] === 'personal') return { name: 'personal' };
+    if (parts[0] === 'alunos') return { name: 'students' };
+    if (parts[0] === 'ficha' && parts[1]) return planRoute('', parts.slice(1));
+    if (parts[0] === 'aluno' && parts[1]) {
+        const studentUid = parts[1];
+        if (parts[2] === 'progresso') return { name: 'studentProgress', studentUid };
+        if (parts[2] === 'ficha' && parts[3]) return planRoute('student-', parts.slice(3), { studentUid });
+        return { name: 'student', studentUid };
     }
     return { name: 'home' };
 }
 
+function path(parts) {
+    return '#' + parts.filter(Boolean).map(encodeURIComponent).join('/');
+}
+
 export function planPath(planId, workoutId, extra) {
-    return '#' + ['ficha', planId, workoutId, extra].filter(Boolean).map(encodeURIComponent).join('/');
+    return path(['ficha', planId, workoutId, extra]);
+}
+
+// Telas do aluno no modo personal: studentPath(uid), studentPath(uid, 'progresso'),
+// studentPath(uid, 'ficha', planId, workoutId, 'adicionar')
+export function studentPath(studentUid, ...rest) {
+    return path(['aluno', studentUid, ...rest]);
 }
 
 const CHANGE = 'routechange';

@@ -10,6 +10,7 @@ export const KEYS = {
     sessions: 'treino.session',            // treino em andamento, por treino (não vai para a nuvem)
     lastWorkout: 'treino.lastWorkout',     // { key: id do treino escolhido por último }
     cloudMeta: 'treino.cloudMeta',         // estado da sincronização (cloud.js)
+    trainerNotice: 'treino.trainerNotice', // ids das fichas atualizadas pelo personal, até o aviso ser fechado
     exerciseData: 'treino.exerciseData',   // v1: últimos valores, por 'A|Agachamento'
     schemaVersion: 'treino.schemaVersion', // { version }; sem ele, os dados são da versão 1
     backup: 'treino.backupBeforeMigration' // cópia dos dados antes da última migração
@@ -112,6 +113,7 @@ function loadLocalData() {
         lastValues: storageGet(KEYS.lastValues, {}),
         sessions: storageGet(KEYS.sessions, {}),
         cloudMeta: storageGet(KEYS.cloudMeta, {}),
+        trainerNotice: storageGetArray(KEYS.trainerNotice),
         lastWorkout: storageGet(KEYS.lastWorkout, {}).key || null
     };
 }

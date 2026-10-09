@@ -97,7 +97,8 @@ function HistoryEntryEditor({ entry, onClose }) {
     );
 }
 
-function HistoryEntry({ entry, records }) {
+// readOnly: histórico de um aluno, visto pelo personal (sem editar nem apagar)
+function HistoryEntry({ entry, records, readOnly }) {
     const [editing, setEditing] = useState(false);
 
     function remove() {
@@ -131,10 +132,12 @@ function HistoryEntry({ entry, records }) {
                             </tbody>
                         </table>
                         {entry.workoutNote && <p class="history-workout-note">"{entry.workoutNote}"</p>}
-                        <div class="history-entry-actions">
-                            <button class="edit-entry-btn" onClick={() => setEditing(true)}>✏️ Editar</button>
-                            <button class="delete-entry-btn" onClick={remove}>🗑️ Apagar</button>
-                        </div>
+                        {!readOnly && (
+                            <div class="history-entry-actions">
+                                <button class="edit-entry-btn" onClick={() => setEditing(true)}>✏️ Editar</button>
+                                <button class="delete-entry-btn" onClick={remove}>🗑️ Apagar</button>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -142,18 +145,23 @@ function HistoryEntry({ entry, records }) {
     );
 }
 
-export function HistorySection() {
-    const { history } = getState();
+export function HistoryList({ history, readOnly = false, empty }) {
     const records = recordKeys(history);
+    return (
+        <div id="history-list">
+            {history.length === 0
+                ? <p class="history-empty">{empty}</p>
+                : history.map((entry) => <HistoryEntry key={entry.id} entry={entry} records={records} readOnly={readOnly} />)}
+        </div>
+    );
+}
+
+export function HistorySection() {
     return (
         <div class="history-section">
             <details>
                 <summary>📅 Histórico de treinos <span class="chev">▼</span></summary>
-                <div id="history-list">
-                    {history.length === 0
-                        ? <p class="history-empty">Nenhum treino finalizado ainda. Ao terminar, toque em "Finalizar treino".</p>
-                        : history.map((entry) => <HistoryEntry key={entry.id} entry={entry} records={records} />)}
-                </div>
+                <HistoryList history={getState().history} empty={'Nenhum treino finalizado ainda. Ao terminar, toque em "Finalizar treino".'} />
             </details>
         </div>
     );
