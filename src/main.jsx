@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { initStore } from './store.js';
 import { onStorageError } from './storage.js';
 import { initTimer } from './timer.js';
+import { initWakeLock } from './wake-lock.js';
 import { initCloud, pickFirebaseEnv } from './cloud.js';
 import { initMonitoring, reportError } from './monitoring.js';
 import { App } from './ui/App.jsx';
@@ -21,6 +22,7 @@ if (!problem) {
         showToast('⚠️ Não foi possível salvar neste celular (armazenamento cheio?)');
         reportError(err, 'storage');
     });
+    initWakeLock();
     initTimer();
     // Antes de desenhar: as telas já precisam saber se há nuvem neste endereço
     initCloud();

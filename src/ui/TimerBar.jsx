@@ -13,6 +13,7 @@ export function TimerBar() {
             <span id="timer-display">{finished ? 'Acabou!' : formatTime(remaining)}</span>
             <button id="add-time" onClick={() => addTime(30)} style={{ display: finished ? 'none' : '' }}>+30s</button>
             <button id="stop-timer" onClick={stopTimer} style={{ color }}>Fechar / Parar</button>
+            {!finished && <span id="timer-hint">🔔 O alarme só toca com a tela ligada e o app aberto</span>}
         </div>
     );
 }

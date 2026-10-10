@@ -79,6 +79,77 @@ test('timer de descanso: abre, ganha +30s e fecha', async ({ page }) => {
     await expect(bar).not.toHaveClass(/visible/);
 });
 
+test('timer de descanso: conta pela hora de término e continua depois de recarregar', async ({ page }) => {
+    // Relógio controlado: os ticks só andam quando o teste manda, como com a tela desligada
+    await page.clock.install();
+    await page.goto(APP);
+    const display = page.locator('#timer-display');
+    await exerciseCard(page, AGACHAMENTO).getByRole('button', { name: /Descanso \(2:30\)/ }).click();
+    await expect(display).toHaveText('2:30');
+    await expect(page.locator('#timer-hint')).toHaveText(/alarme só toca com a tela ligada/);
+
+    // Passou 1 min sem nenhum tick (app em segundo plano); ao voltar, o timer se acerta
+    const back = () => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    const start = await page.evaluate(() => Date.now());
+    await page.clock.setSystemTime(start + 60 * 1000);
+    await back();
+    await expect(display).toHaveText('1:30');
+
+    // O celular recarregou o app no meio do descanso
+    await page.reload();
+    await expect(page.locator('#timer-bar')).toHaveClass(/visible/);
+    await expect(display).toHaveText('1:30');
+
+    await page.clock.setSystemTime(start + 160 * 1000);
+    await back();
+    await expect(display).toHaveText('Acabou!');
+    await expect(page.locator('#timer-hint')).toHaveCount(0);
+
+    // Descanso que já acabou não volta ao recarregar
+    await page.reload();
+    await expect(exerciseCard(page, AGACHAMENTO)).toBeVisible();
+    await expect(page.locator('#timer-bar')).not.toHaveClass(/visible/);
+});
+
+test('tela ligada durante o treino, até finalizar', async ({ page }) => {
+    // Wake Lock API de mentira, que conta os bloqueios ativos
+    await page.addInitScript(() => {
+        const wake = { requests: 0, held: 0 };
+        window.__wakeLock = wake;
+        Object.defineProperty(navigator, 'wakeLock', {
+            configurable: true,
+            value: {
+                async request() {
+                    wake.requests++;
+                    wake.held++;
+                    let released = false;
+                    return {
+                        addEventListener() {},
+                        async release() { if (!released) { released = true; wake.held--; } }
+                    };
+                }
+            }
+        });
+    });
+    await page.goto(APP);
+    const held = () => page.evaluate(() => window.__wakeLock.held);
+    await expect(exerciseCard(page, AGACHAMENTO)).toBeVisible();
+    // Só abrir o app não segura a tela
+    expect(await held()).toBe(0);
+
+    await exerciseCard(page, AGACHAMENTO).getByRole('button', { name: 'Série 1', exact: true }).click();
+    await expect.poll(held).toBe(1);
+
+    // Descanso começa e termina: a tela continua ligada, porque o treino não acabou
+    await exerciseCard(page, AGACHAMENTO).getByRole('button', { name: /Descanso/ }).click();
+    await page.getByRole('button', { name: 'Fechar / Parar' }).click();
+    await expect.poll(held).toBe(1);
+
+    await page.getByRole('button', { name: /Finalizar treino/ }).click();
+    await expect.poll(held).toBe(0);
+    expect(await page.evaluate(() => window.__wakeLock.requests)).toBe(1);
+});
+
 test('o endereço antigo (meu_treino_app.html) leva ao app', async ({ page }) => {
     await page.goto('meu_treino_app.html');
     await expect(page).toHaveURL(/\/treino-app\/$/);

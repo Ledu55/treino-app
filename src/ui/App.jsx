@@ -4,6 +4,7 @@ import {
     getPlanTrainer, getState, selectWorkout, setWorkoutNote, subscribe, workoutExercises
 } from '../store.js';
 import { recordMessage } from '../stats.js';
+import { endWorkoutActivity } from '../wake-lock.js';
 import { CloudSection } from './CloudSection.jsx';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { HistorySection } from './HistorySection.jsx';
@@ -97,6 +98,7 @@ function WorkoutScreen() {
         if (done < exercises.length / 2
             && !confirm(`Só ${done} de ${exercises.length} exercícios concluídos. Finalizar mesmo assim?`)) return;
         const records = finishWorkout(workout);
+        endWorkoutActivity();
         if (records.length > 0) showToast(recordMessage(records), 6000);
         else showToast('Treino salvo no histórico 💪');
     }

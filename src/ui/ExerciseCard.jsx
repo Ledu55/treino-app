@@ -3,6 +3,7 @@ import {
 } from '../store.js';
 import { computeSuggestion, formatKg, formatWeight, getSetValues } from '../progression.js';
 import { formatTime, startTimer } from '../timer.js';
+import { noteWorkoutActivity } from '../wake-lock.js';
 import { useDebouncedField } from './hooks.js';
 import { showToast } from './Toast.jsx';
 
@@ -20,7 +21,7 @@ function SetBox({ workoutId, ex, setIndex, label, ariaLabel, warmup }) {
             data-set-index={setIndex}
             aria-pressed={active ? 'true' : 'false'}
             aria-label={ariaLabel}
-            onClick={() => toggleSet(workoutId, ex, setIndex)}
+            onClick={() => { toggleSet(workoutId, ex, setIndex); noteWorkoutActivity(); }}
         >
             {label}
         </button>

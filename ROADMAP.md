@@ -1,13 +1,13 @@
 # Roadmap — Meu Treino
 
-Plano de evolução do app: começou atendendo uma pessoa, e o objetivo é que várias pessoas usem, cada uma com fichas personalizadas, montadas por ela mesma ou por um personal. Com o item 12, as fases 1 a 4 estão prontas; falta o item 13 (refinamentos) e o último passo do item 5 (testar as migrações com dados reais anonimizados).
+Plano de evolução do app: começou atendendo uma pessoa, e o objetivo é que várias pessoas usem, cada uma com fichas personalizadas, montadas por ela mesma ou por um personal. As fases 1 a 4 estão prontas, inclusive o timer de descanso do item 13; ficam em aberto os ajustes que o uso pedir (item 13) e o último passo do item 5 (testar as migrações com dados reais anonimizados).
 
 ## Onde estamos
 
 - PWA em Vite + Preact ([src/](src/)), publicado no GitHub Pages pelo GitHub Actions; o service worker ([src/sw.js](src/sw.js), gerado pelo `vite-plugin-pwa`) guarda o app em cache para uso offline e avisa quando há versão nova.
 - Fichas com ids fixos, montadas a partir da biblioteca de exercícios ([src/data/exercises.json](src/data/exercises.json)); a ficha A/B/C/D virou a primeira ficha (e o primeiro modelo, em [src/data/templates.js](src/data/templates.js)).
 - Dados no `localStorage` (formato v2): perfil, fichas, histórico sem limite, últimos valores digitados e treino em andamento.
-- Registro de carga e reps por série, histórico de treinos, timer de descanso.
+- Registro de carga e reps por série, histórico de treinos, timer de descanso (pela hora de término, com a tela ligada durante o treino).
 - Sugestão de carga por progressão dupla (`computeSuggestion`).
 - Gráficos de carga e volume por exercício, aviso de recorde pessoal e frequência semanal.
 - Backup na nuvem com login Google (Firebase Auth + Firestore, projeto `treino-app-21fcd`): perfil em `users/{uid}`, um documento por ficha e por treino finalizado, sincronizados por [src/cloud.js](src/cloud.js) (só o que mudou) e mesclados por [src/sync.js](src/sync.js).
@@ -228,11 +228,13 @@ A lógica sem rede fica em [src/personal.js](src/personal.js), a parte online em
 
 ### 13. ✨ Refinamentos
 
-- [ ] Timer de descanso confiável. Ela continua iniciando o timer manualmente; iniciar o timer automaticamente foi recusado.
-  - Manter a tela ligada durante o treino com a Wake Lock API (pedir de novo quando o app volta ao primeiro plano).
-  - Calcular o timer pela hora de término, não por contagem de ticks, para ele estar certo ao voltar ao app.
-  - Avisar na interface que o alarme depende da tela ligada.
+- [x] Timer de descanso confiável. Ela continua iniciando o timer manualmente; iniciar o timer automaticamente foi recusado.
+  - Manter a tela ligada durante o treino com a Wake Lock API ([src/wake-lock.js](src/wake-lock.js)), pedindo de novo quando o app volta ao primeiro plano. "Durante o treino" é enquanto o timer corre e até 30 min depois da última série marcada ou do último descanso iniciado; finalizar o treino solta a tela. Só abrir o app não segura a tela, para ela não ficar ligada se o app ficar aberto em cima da mesa ou se um treino não for finalizado. Sem a API, ou se o celular recusar (ex.: economia de bateria), a tela apaga como antes.
+  - Calcular o timer pela hora de término, não por contagem de ticks, para ele estar certo ao voltar ao app. A hora de término também fica no `sessionStorage` (`treino.timer`), então o descanso continua se o celular recarregar o app no meio dele; nesse caso o alarme só tem som depois do primeiro toque na tela (regra do navegador).
+  - Aviso na barra do timer: "O alarme só toca com a tela ligada e o app aberto".
   - Alarme com a tela desligada fica fora: tanto o Android quanto o iOS suspendem o JavaScript em segundo plano, e um aviso confiável exigiria push vindo de um servidor. Reavaliar só se fizer falta no uso.
+
+  Testado em [tests/unit/wake-lock.test.js](tests/unit/wake-lock.test.js) e nos testes de ponta a ponta "timer de descanso: conta pela hora de término..." e "tela ligada durante o treino, até finalizar".
 - [ ] Outros ajustes conforme o uso.
 
 ---
